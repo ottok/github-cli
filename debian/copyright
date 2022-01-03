@@ -4,7 +4,7 @@ Upstream-Name: cli
 Upstream-Contact: https://github.com/cli/cli/issues/new
 
 Files: *
-Copyright: 2019 GitHub CLI
+Copyright: 2019 GitHub Inc.
 License: Expat
 
 Files: debian/*
