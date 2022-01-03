@@ -1,0 +1,78 @@
+Source: gh
+Section: golang
+Priority: optional
+Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
+Uploaders: Anthony Fok <foka@debian.org>
+Rules-Requires-Root: no
+Build-Depends: debhelper-compat (= 13),
+               dh-sequence-bash-completion,
+               dh-sequence-golang,
+               git,
+               golang-any,
+               golang-github-alecaivazis-survey-dev (>= 2.3.2),
+               golang-github-briandowns-spinner-dev (>= 1.18.0),
+               golang-github-charmbracelet-glamour-dev (>= 0.3.0),
+               golang-github-cli-browser-dev (>= 1.1.0),
+               golang-github-cli-oauth-dev (>= 0.9.0),
+               golang-github-cli-safeexec-dev (>= 1.0.0),
+               golang-github-cli-shurcool-graphql-dev (>= 0.0.1),
+               golang-github-cpuguy83-go-md2man-v2-dev (>= 2.0.1),
+               golang-github-creack-pty-dev (>= 1.1.17),
+               golang-github-gabriel-vasile-mimetype-dev (>= 1.4.0),
+               golang-github-google-go-cmp-dev (>= 0.5.6),
+               golang-github-google-shlex-dev (>= 0.0~git20191202.e7afc7f),
+               golang-github-gorilla-websocket-dev (>= 1.4.2),
+               golang-github-hashicorp-go-multierror-dev (>= 1.1.0),
+               golang-github-hashicorp-go-version-dev (>= 1.3.0),
+               golang-github-henvic-httpretty-dev (>= 0.0.6),
+               golang-github-itchyny-gojq-dev (>= 0.12.6),
+               golang-github-joho-godotenv-dev (>= 1.4.0),
+               golang-github-kballard-go-shellquote-dev (>= 0.0~git20180428.95032a8),
+               golang-github-makenowjust-heredoc-dev (>= 1.0.0),
+               golang-github-mattn-go-colorable-dev (>= 0.1.12),
+               golang-github-mattn-go-isatty-dev (>= 0.0.14),
+               golang-github-mgutz-ansi-dev (>= 0.0~git20200706.d51e80e),
+               golang-github-muesli-reflow-dev (>= 0.2.0+git20210502.c80126e),
+               golang-github-muesli-termenv-dev (>= 0.9.0),
+               golang-github-muhammadmuzzammil1998-jsonc-dev (>= 0.0~git20201229.615b091),
+               golang-github-opentracing-opentracing-go-dev (>= 1.1.0),
+               golang-github-shurcool-githubv4-dev (>= 0.0~git20200928.d292edc),
+               golang-github-sourcegraph-jsonrpc2-dev (>= 0.1.0),
+               golang-github-spf13-cobra-dev (>= 1.3.0),
+               golang-github-spf13-pflag-dev (>= 1.0.5),
+               golang-github-stretchr-testify-dev (>= 1.7.0),
+               golang-golang-x-crypto-dev (>= 1:0.0~git20210817.32db794),
+               golang-golang-x-sync-dev (>= 0.0~git20210220.036812b),
+               golang-golang-x-term-dev (>= 0.0~git20210503.a79de54),
+               golang-gopkg-yaml.v3-dev (>= 3.0.0~git20210107.496545a),
+               openssh-client,
+Testsuite: autopkgtest-pkg-go
+Standards-Version: 4.6.0
+Vcs-Browser: https://salsa.debian.org/go-team/packages/gh
+Vcs-Git: https://salsa.debian.org/go-team/packages/gh.git
+Homepage: https://github.com/cli/cli
+XS-Go-Import-Path: github.com/cli/cli/v2
+
+Package: gh
+Section: utils
+Architecture: any
+Depends: ${misc:Depends},
+         ${shlibs:Depends}
+Built-Using: ${misc:Built-Using}
+Description: GitHub CLI, GitHub’s official command line tool
+ GitHub CLI "gh" is GitHub on the command line.  It brings pull requests,
+ issues, and other GitHub concepts to the terminal next to where you are
+ already working with git and your code.
+ .
+ GitHub CLI is available for repositories hosted on GitHub.com and GitHub
+ Enterprise Server 2.20+, and to install on macOS, Windows, and Linux.
+ .
+ Comparison with hub:
+ .
+ For many years, hub (https://github.com/github/hub) was the unofficial
+ GitHub CLI tool.  gh is a new project that helps us explore what an
+ official GitHub CLI tool can look like with a fundamentally different
+ design.  While both tools bring GitHub to the terminal, hub behaves as a
+ proxy to git, and gh is a standalone tool.  Check out the more detailed
+ explanation at https://github.com/cli/cli/blob/trunk/docs/gh-vs-hub.md
+ to learn more.

@@ -1,0 +1,43 @@
+#!/usr/bin/make -f
+
+export DH_GOLANG_EXCLUDES := script
+export DH_GOLANG_INSTALL_ALL := 1
+
+DATE_FMT = %Y-%m-%d
+ifdef SOURCE_DATE_EPOCH
+  BUILD_DATE ?= $(shell date -u -d "@$(SOURCE_DATE_EPOCH)" "+$(DATE_FMT)" 2>/dev/null || date -u -r "$(SOURCE_DATE_EPOCH)" "+$(DATE_FMT)" 2>/dev/null || date -u "+$(DATE_FMT)")
+else
+  BUILD_DATE ?= $(shell date -u "+$(DATE_FMT)")
+endif
+
+DEBIAN_VERSION := $(shell dpkg-parsechangelog --show-field Version)
+BUILD_VERSION := $(shell echo "$(DEBIAN_VERSION)" | sed 's/-.*//')
+VENDOR := $(shell . /etc/os-release; echo $$ID | sed 's/^./\u&/')
+BUILD_DATE += $(VENDOR) $(DEBIAN_VERSION)
+
+LDFLAGS := -ldflags \
+	'-X "github.com/cli/cli/v2/internal/build.Date=$(BUILD_DATE)" \
+	 -X "github.com/cli/cli/v2/internal/build.Version=$(BUILD_VERSION)"'
+
+all:
+	@echo $(LDFLAGS)
+%:
+	dh $@ --builddirectory=_build --buildsystem=golang
+
+execute_before_dh_auto_configure:
+	mkdir -p _build/src/golang.org/x
+	ln -s $(CURDIR)/debian/go/src/github.com/cli/crypto _build/src/golang.org/x/crypto
+
+override_dh_auto_build:
+	@command -V go
+	@go version
+	dh_auto_build -- $(LDFLAGS)
+	_build/bin/gh --version
+	mkdir -p _build/completion/bash _build/completion/zsh
+	_build/bin/gh completion -s bash > _build/completion/bash/gh
+	_build/bin/gh completion -s zsh > _build/completion/zsh/_gh
+	_build/bin/gen-docs --man-page --doc-path _build/share/man/man1/
+	$(RM) _build/bin/gen-docs
+
+override_dh_auto_install:
+	dh_auto_install -- --no-source

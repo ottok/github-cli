@@ -1,0 +1,5 @@
+gh (2.4.0-1) unstable; urgency=medium
+
+  * Initial release (Closes: #951374)
+
+ -- Anthony Fok <foka@debian.org>  Mon, 03 Jan 2022 13:07:01 -0700
