@@ -1,5 +1,18 @@
-gh (2.4.0-1) unstable; urgency=medium
+gh (2.4.0+dfsg1-1) unstable; urgency=medium
 
   * Initial release (Closes: #951374)
+  * Remove script/signtool.exe from source tarball.
+    SignTool from Windows SDK is not open-source software, see
+    https://docs.microsoft.com/en-us/windows/win32/seccrypto/signtool
+    Thanks to Thorsten Alteholz for the advice regarding signtool.exe
+  * Adjust debian/watch to add +dfsg1 suffix,
+    to skip upstream's v9.9.9-test and pre-releases,
+    and to fetch all past tags from api.github.com
+
+ -- Anthony Fok <foka@debian.org>  Tue, 15 Feb 2022 00:56:31 -0700
+
+gh (2.4.0-1) UNRELEASED; urgency=medium
+
+  * Initial pre-release
 
  -- Anthony Fok <foka@debian.org>  Mon, 03 Jan 2022 13:07:01 -0700
