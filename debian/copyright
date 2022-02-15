@@ -2,6 +2,7 @@ Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Source: https://github.com/cli/cli
 Upstream-Name: GitHub CLI
 Upstream-Contact: https://github.com/cli/cli/issues/new
+Files-Excluded: script/signtool.exe
 
 Files: *
 Copyright: 2019 GitHub Inc.
