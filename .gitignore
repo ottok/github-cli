@@ -21,6 +21,3 @@
 *.swp
 
 vendor/
-
-/.pc/
-/_build/
