@@ -1,3 +1,11 @@
+gh (2.4.0+dfsg1-2) unstable; urgency=medium
+
+  * Add "Conflicts: gitsome" which also provides /usr/bin/gh.
+    Thanks to Axel Beckert for the bug report. (Closes: #1005858)
+  * Source-only upload for migration to testing
+
+ -- Anthony Fok <foka@debian.org>  Wed, 23 Mar 2022 04:10:32 -0600
+
 gh (2.4.0+dfsg1-1) unstable; urgency=medium
 
   * Initial release (Closes: #951374)
