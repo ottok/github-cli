@@ -1,3 +1,18 @@
+gh (2.4.0+dfsg1-3) unstable; urgency=medium
+
+  * Limit "Conflicts: gitsome" to older (<< 0.8.0+ds-7.1) versions.
+    Thanks to Antoine Beaupre for the suggestion, and for resolving the
+    file conflict with gitsome (#1005858) so amicably! (Closes: #1011545)
+  * Change default editor from nano to /usr/bin/editor as per Debian Policy
+    §11.4. Thanks to Jakub Wilk for the bug report. (Closes: #1008761)
+  * Rename "Build-Using" field to "Static-Build-Using" in debian/control
+  * Add diversion for /usr/bin/gh to allow concurrent install with gitsome
+    and remove Conflicts with gitsome. This is inspired by the conflict
+    resolution between the moreutils and parallel packages where both
+    contain /usr/bin/parallel.  See discussions in #749355.
+
+ -- Anthony Fok <foka@debian.org>  Tue, 31 May 2022 01:58:33 -0600
+
 gh (2.4.0+dfsg1-2) unstable; urgency=medium
 
   * Add "Conflicts: gitsome" which also provides /usr/bin/gh.
