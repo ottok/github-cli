@@ -58,6 +58,7 @@ Section: utils
 Architecture: any
 Depends: ${misc:Depends},
          ${shlibs:Depends}
+Conflicts: gitsome (<< 0.8.0+ds-7.1)
 Static-Built-Using: ${misc:Static-Built-Using}
 Description: GitHub CLI, GitHub’s official command line tool
  GitHub CLI "gh" is GitHub on the command line.  It brings pull requests,
