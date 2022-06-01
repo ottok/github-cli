@@ -1,3 +1,12 @@
+gh (2.4.0+dfsg1-4) unstable; urgency=medium
+
+  * Revert "Add diversion for /usr/bin/gh to allow concurrent install
+    with gitsome", and restore the versioned Conflicts with gitsome.
+    Thanks to Antoine Beaupré for talking some sense into me especially
+    this case is not like moreutils and parallel. (Closes: #1011545)
+
+ -- Anthony Fok <foka@debian.org>  Wed, 01 Jun 2022 16:55:59 -0600
+
 gh (2.4.0+dfsg1-3) unstable; urgency=medium
 
   * Limit "Conflicts: gitsome" to older (<< 0.8.0+ds-7.1) versions.
