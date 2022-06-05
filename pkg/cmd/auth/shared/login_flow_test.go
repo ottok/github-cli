@@ -2,8 +2,8 @@ package shared
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net/http"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -30,9 +30,13 @@ func (c tinyConfig) Write() error {
 	return nil
 }
 
+func (c tinyConfig) WriteHosts() error {
+	return nil
+}
+
 func TestLogin_ssh(t *testing.T) {
 	dir := t.TempDir()
-	io, _, stdout, stderr := iostreams.Test()
+	ios, _, stdout, stderr := iostreams.Test()
 
 	tr := httpmock.Registry{}
 	defer tr.Verify(t)
@@ -47,14 +51,14 @@ func TestLogin_ssh(t *testing.T) {
 		httpmock.REST("POST", "api/v3/user/keys"),
 		httpmock.StringResponse(`{}`))
 
-	ask, askRestore := prompt.InitAskStubber()
-	defer askRestore()
+	ask := prompt.NewAskStubber(t)
 
-	ask.StubOne("SSH")    // preferred protocol
-	ask.StubOne(true)     // generate a new key
-	ask.StubOne("monkey") // enter a passphrase
-	ask.StubOne(1)        // paste a token
-	ask.StubOne("ATOKEN") // token
+	ask.StubPrompt("What is your preferred protocol for Git operations?").AnswerWith("SSH")
+	ask.StubPrompt("Generate a new SSH key to add to your GitHub account?").AnswerWith(true)
+	ask.StubPrompt("Enter a passphrase for your new SSH key (Optional)").AnswerWith("monkey")
+	ask.StubPrompt("Title for your SSH key:").AnswerWith("Test Key")
+	ask.StubPrompt("How would you like to authenticate GitHub CLI?").AnswerWith("Paste an authentication token")
+	ask.StubPrompt("Paste your authentication token:").AnswerWith("ATOKEN")
 
 	rs, runRestore := run.Stub()
 	defer runRestore(t)
@@ -69,13 +73,13 @@ func TestLogin_ssh(t *testing.T) {
 		}
 		assert.Equal(t, expected, args)
 		// simulate that the public key file has been generated
-		_ = ioutil.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
+		_ = os.WriteFile(keyFile+".pub", []byte("PUBKEY"), 0600)
 	})
 
 	cfg := tinyConfig{}
 
 	err := Login(&LoginOptions{
-		IO:          io,
+		IO:          ios,
 		Config:      &cfg,
 		HTTPClient:  &http.Client{Transport: &tr},
 		Hostname:    "example.com",

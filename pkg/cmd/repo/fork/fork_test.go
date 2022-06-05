@@ -2,7 +2,7 @@ package fork
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -45,7 +45,7 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git args without repo",
 			cli:     "-- --foo bar",
 			wantErr: true,
-			errMsg:  "repository argument required when passing 'git clone' flags",
+			errMsg:  "repository argument required when passing git clone flags",
 		},
 		{
 			name: "repo",
@@ -130,20 +130,30 @@ func TestNewCmdFork(t *testing.T) {
 			name:    "git flags in wrong place",
 			cli:     "--depth 1 OWNER/REPO",
 			wantErr: true,
-			errMsg:  "unknown flag: --depth\nSeparate git clone flags with '--'.",
+			errMsg:  "unknown flag: --depth\nSeparate git clone flags with `--`.",
+		},
+		{
+			name: "with fork name",
+			cli:  "--fork-name new-fork",
+			wants: ForkOptions{
+				Remote:     false,
+				RemoteName: "origin",
+				ForkName:   "new-fork",
+				Rename:     false,
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
-			io.SetStdoutTTY(tt.tty)
-			io.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetStdinTTY(tt.tty)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -198,15 +208,15 @@ func TestRepoFork(t *testing.T) {
 		httpStubs  func(*httpmock.Registry)
 		execStubs  func(*run.CommandStubber)
 		askStubs   func(*prompt.AskStubber)
+		cfg        func(config.Config) config.Config
 		remotes    []*context.Remote
 		wantOut    string
 		wantErrOut string
 		wantErr    bool
 		errMsg     string
 	}{
-		// TODO implicit, override existing remote's protocol with configured protocol
 		{
-			name: "implicit match existing remote's protocol",
+			name: "implicit match, configured protocol overrides provided",
 			tty:  true,
 			opts: &ForkOptions{
 				Remote:     true,
@@ -219,6 +229,31 @@ func TestRepoFork(t *testing.T) {
 					}},
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
+			},
+			httpStubs: forkPost,
+			execStubs: func(cs *run.CommandStubber) {
+				cs.Register(`git remote add -f fork https://github\.com/someone/REPO\.git`, 0, "")
+			},
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote fork\n",
+		},
+		{
+			name: "implicit match, no configured protocol",
+			tty:  true,
+			opts: &ForkOptions{
+				Remote:     true,
+				RemoteName: "fork",
+			},
+			remotes: []*context.Remote{
+				{
+					Remote: &git.Remote{Name: "origin", PushURL: &url.URL{
+						Scheme: "ssh",
+					}},
+					Repo: ghrepo.New("OWNER", "REPO"),
+				},
+			},
+			cfg: func(c config.Config) config.Config {
+				_ = c.Set("", "git_protocol", "")
+				return c
 			},
 			httpStubs: forkPost,
 			execStubs: func(cs *run.CommandStubber) {
@@ -236,6 +271,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
@@ -254,6 +290,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git remote add -f origin https://github.com/someone/REPO.git`, 0, "")
 			},
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n✓ Added remote origin\n",
@@ -401,7 +438,7 @@ func TestRepoFork(t *testing.T) {
 				reg.Register(
 					httpmock.REST("POST", "repos/OWNER/REPO/forks"),
 					func(req *http.Request) (*http.Response, error) {
-						bb, err := ioutil.ReadAll(req.Body)
+						bb, err := io.ReadAll(req.Body)
 						if err != nil {
 							return nil, err
 						}
@@ -409,7 +446,7 @@ func TestRepoFork(t *testing.T) {
 						return &http.Response{
 							Request:    req,
 							StatusCode: 200,
-							Body:       ioutil.NopCloser(bytes.NewBufferString(`{"name":"REPO", "owner":{"login":"gamehendge"}}`)),
+							Body:       io.NopCloser(bytes.NewBufferString(`{"name":"REPO", "owner":{"login":"gamehendge"}}`)),
 						}, nil
 					})
 			},
@@ -442,6 +479,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(false)
 			},
 			wantErrOut: "✓ Created fork someone/REPO\n",
@@ -455,6 +493,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
@@ -475,6 +514,7 @@ func TestRepoFork(t *testing.T) {
 			},
 			httpStubs: forkPost,
 			askStubs: func(as *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 				as.StubOne(true)
 			},
 			execStubs: func(cs *run.CommandStubber) {
@@ -529,14 +569,86 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git -C REPO remote add -f upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 			},
 		},
+		{
+			name: "non tty repo arg with fork-name",
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+				Clone:      false,
+				ForkName:   "NEW_REPO",
+			},
+			tty: false,
+			httpStubs: func(reg *httpmock.Registry) {
+				forkResult := `{
+					"node_id": "123",
+					"name": "REPO",
+					"clone_url": "https://github.com/OWNER/REPO.git",
+					"created_at": "2011-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				renameResult := `{
+					"node_id": "1234",
+					"name": "NEW_REPO",
+					"clone_url": "https://github.com/OWNER/NEW_REPO.git",
+					"created_at": "2012-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StringResponse(renameResult))
+			},
+			wantErrOut: "",
+		},
+		{
+			name: "tty repo arg with fork-name",
+			opts: &ForkOptions{
+				Repository: "someone/REPO",
+				Clone:      false,
+				ForkName:   "NEW_REPO",
+			},
+			tty: true,
+			httpStubs: func(reg *httpmock.Registry) {
+				forkResult := `{
+					"node_id": "123",
+					"name": "REPO",
+					"clone_url": "https://github.com/OWNER/REPO.git",
+					"created_at": "2011-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				renameResult := `{
+					"node_id": "1234",
+					"name": "NEW_REPO",
+					"clone_url": "https://github.com/OWNER/NEW_REPO.git",
+					"created_at": "2012-01-26T19:01:12Z",
+					"owner": {
+						"login": "OWNER"
+					}
+				}`
+				reg.Register(
+					httpmock.REST("POST", "repos/someone/REPO/forks"),
+					httpmock.StringResponse(forkResult))
+				reg.Register(
+					httpmock.REST("PATCH", "repos/OWNER/REPO"),
+					httpmock.StringResponse(renameResult))
+			},
+			wantErrOut: "✓ Created fork OWNER/REPO\n✓ Renamed fork to OWNER/NEW_REPO\n",
+		},
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		io.SetStderrTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		ios.SetStderrTTY(tt.tty)
+		tt.opts.IO = ios
 
 		tt.opts.BaseRepo = func() (ghrepo.Interface, error) {
 			return ghrepo.New("OWNER", "REPO"), nil
@@ -551,6 +663,9 @@ func TestRepoFork(t *testing.T) {
 		}
 
 		cfg := config.NewBlankConfig()
+		if tt.cfg != nil {
+			cfg = tt.cfg(cfg)
+		}
 		tt.opts.Config = func() (config.Config, error) {
 			return cfg, nil
 		}
@@ -570,6 +685,7 @@ func TestRepoFork(t *testing.T) {
 			return tt.remotes, nil
 		}
 
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		as, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {

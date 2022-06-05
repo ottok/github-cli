@@ -4,16 +4,20 @@ package codespace
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"text/template"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/codespaces"
+	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/liveshare"
 	"github.com/spf13/cobra"
@@ -25,6 +29,8 @@ type sshOptions struct {
 	serverPort int
 	debug      bool
 	debugFile  string
+	stdio      bool
+	config     bool
 	scpArgs    []string // scp arguments, for 'cs cp' (nil for 'cs ssh')
 }
 
@@ -34,8 +40,57 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd := &cobra.Command{
 		Use:   "ssh [<flags>...] [-- <ssh-flags>...] [<command>]",
 		Short: "SSH into a codespace",
+		Long: heredoc.Doc(`
+			The 'ssh' command is used to SSH into a codespace. In its simplest form, you can
+			run 'gh cs ssh', select a codespace interactively, and connect.
+
+			The 'ssh' command also supports deeper integration with OpenSSH using a
+			'--config' option that generates per-codespace ssh configuration in OpenSSH
+			format. Including this configuration in your ~/.ssh/config improves the user
+			experience of tools that integrate with OpenSSH, such as bash/zsh completion of
+			ssh hostnames, remote path completion for scp/rsync/sshfs, git ssh remotes, and
+			so on.
+
+			Once that is set up (see the second example below), you can ssh to codespaces as
+			if they were ordinary remote hosts (using 'ssh', not 'gh cs ssh').
+		`),
+		Example: heredoc.Doc(`
+			$ gh codespace ssh
+
+			$ gh codespace ssh --config > ~/.ssh/codespaces
+			$ printf 'Match all\nInclude ~/.ssh/codespaces\n' >> ~/.ssh/config
+		`),
+		PreRunE: func(c *cobra.Command, args []string) error {
+			if opts.stdio {
+				if opts.codespace == "" {
+					return errors.New("`--stdio` requires explicit `--codespace`")
+				}
+				if opts.config {
+					return errors.New("cannot use `--stdio` with `--config`")
+				}
+				if opts.serverPort != 0 {
+					return errors.New("cannot use `--stdio` with `--server-port`")
+				}
+				if opts.profile != "" {
+					return errors.New("cannot use `--stdio` with `--profile`")
+				}
+			}
+			if opts.config {
+				if opts.profile != "" {
+					return errors.New("cannot use `--config` with `--profile`")
+				}
+				if opts.serverPort != 0 {
+					return errors.New("cannot use `--config` with `--server-port`")
+				}
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return app.SSH(cmd.Context(), args, opts)
+			if opts.config {
+				return app.printOpenSSHConfig(cmd.Context(), opts)
+			} else {
+				return app.SSH(cmd.Context(), args, opts)
+			}
 		},
 		DisableFlagsInUseLine: true,
 	}
@@ -45,6 +100,11 @@ func newSSHCmd(app *App) *cobra.Command {
 	sshCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
 	sshCmd.Flags().BoolVarP(&opts.debug, "debug", "d", false, "Log debug data to a file")
 	sshCmd.Flags().StringVarP(&opts.debugFile, "debug-file", "", "", "Path of the file log to")
+	sshCmd.Flags().BoolVarP(&opts.config, "config", "", false, "Write OpenSSH configuration to stdout")
+	sshCmd.Flags().BoolVar(&opts.stdio, "stdio", false, "Proxy sshd connection to stdio")
+	if err := sshCmd.Flags().MarkHidden("stdio"); err != nil {
+		fmt.Fprintf(os.Stderr, "%v\n", err)
+	}
 
 	return sshCmd
 }
@@ -57,48 +117,27 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 
 	codespace, err := getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
 	if err != nil {
-		return fmt.Errorf("get or choose codespace: %w", err)
-	}
-
-	// TODO(josebalius): We can fetch the user in parallel to everything else
-	// we should convert this call and others to happen async
-	user, err := a.apiClient.GetUser(ctx)
-	if err != nil {
-		return fmt.Errorf("error getting user: %w", err)
-	}
-
-	authkeys := make(chan error, 1)
-	go func() {
-		authkeys <- checkAuthorizedKeys(ctx, a.apiClient, user.Login)
-	}()
-
-	liveshareLogger := noopLogger()
-	if opts.debug {
-		debugLogger, err := newFileLogger(opts.debugFile)
-		if err != nil {
-			return fmt.Errorf("error creating debug logger: %w", err)
-		}
-		defer safeClose(debugLogger, &err)
-
-		liveshareLogger = debugLogger.Logger
-		a.errLogger.Printf("Debug file located at: %s", debugLogger.Name())
-	}
-
-	session, err := codespaces.ConnectToLiveshare(ctx, a, liveshareLogger, a.apiClient, codespace)
-	if err != nil {
-		return fmt.Errorf("error connecting to codespace: %w", err)
-	}
-	defer safeClose(session, &err)
-
-	if err := <-authkeys; err != nil {
 		return err
 	}
+
+	session, err := startLiveShareSession(ctx, codespace, a, opts.debug, opts.debugFile)
+	if err != nil {
+		return err
+	}
+	defer safeClose(session, &err)
 
 	a.StartProgressIndicatorWithLabel("Fetching SSH Details")
 	remoteSSHServerPort, sshUser, err := session.StartSSHServer(ctx)
 	a.StopProgressIndicator()
 	if err != nil {
 		return fmt.Errorf("error getting ssh server details: %w", err)
+	}
+
+	if opts.stdio {
+		fwd := liveshare.NewPortForwarder(session, "sshd", remoteSSHServerPort, true)
+		stdio := newReadWriteCloser(os.Stdin, os.Stdout)
+		err := fwd.Forward(ctx, stdio) // always non-nil
+		return fmt.Errorf("tunnel closed: %w", err)
 	}
 
 	localSSHServerPort := opts.serverPort
@@ -147,6 +186,129 @@ func (a *App) SSH(ctx context.Context, sshArgs []string, opts sshOptions) (err e
 	}
 }
 
+func (a *App) printOpenSSHConfig(ctx context.Context, opts sshOptions) (err error) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var csList []*api.Codespace
+	if opts.codespace == "" {
+		a.StartProgressIndicatorWithLabel("Fetching codespaces")
+		csList, err = a.apiClient.ListCodespaces(ctx, -1)
+		a.StopProgressIndicator()
+	} else {
+		var codespace *api.Codespace
+		codespace, err = getOrChooseCodespace(ctx, a.apiClient, opts.codespace)
+		csList = []*api.Codespace{codespace}
+	}
+	if err != nil {
+		return fmt.Errorf("error getting codespace info: %w", err)
+	}
+
+	type sshResult struct {
+		codespace *api.Codespace
+		user      string // on success, the remote ssh username; else nil
+		err       error
+	}
+
+	sshUsers := make(chan sshResult, len(csList))
+	var wg sync.WaitGroup
+	var status error
+	for _, cs := range csList {
+		if cs.State != "Available" && opts.codespace == "" {
+			fmt.Fprintf(os.Stderr, "skipping unavailable codespace %s: %s\n", cs.Name, cs.State)
+			status = cmdutil.SilentError
+			continue
+		}
+
+		cs := cs
+		wg.Add(1)
+		go func() {
+			result := sshResult{}
+			defer wg.Done()
+
+			session, err := codespaces.ConnectToLiveshare(ctx, a, noopLogger(), a.apiClient, cs)
+			if err != nil {
+				result.err = fmt.Errorf("error connecting to codespace: %w", err)
+			} else {
+				defer safeClose(session, &err)
+
+				_, result.user, err = session.StartSSHServer(ctx)
+				if err != nil {
+					result.err = fmt.Errorf("error getting ssh server details: %w", err)
+				} else {
+					result.codespace = cs
+				}
+			}
+
+			sshUsers <- result
+		}()
+	}
+
+	go func() {
+		wg.Wait()
+		close(sshUsers)
+	}()
+
+	// While the above fetches are running, ensure that the user has keys installed.
+	// That lets us report a more useful error message if they don't.
+	if err = checkAuthorizedKeys(ctx, a.apiClient); err != nil {
+		return err
+	}
+
+	t, err := template.New("ssh_config").Parse(heredoc.Doc(`
+		Host cs.{{.Name}}.{{.EscapedRef}}
+			User {{.SSHUser}}
+			ProxyCommand {{.GHExec}} cs ssh -c {{.Name}} --stdio
+			UserKnownHostsFile=/dev/null
+			StrictHostKeyChecking no
+			LogLevel quiet
+			ControlMaster auto
+
+	`))
+	if err != nil {
+		return fmt.Errorf("error formatting template: %w", err)
+	}
+
+	ghExec := a.executable.Executable()
+	for result := range sshUsers {
+		if result.err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", result.err)
+			status = cmdutil.SilentError
+			continue
+		}
+
+		// codespaceSSHConfig contains values needed to write an OpenSSH host
+		// configuration for a single codespace. For example:
+		//
+		// Host {{Name}}.{{EscapedRef}
+		//   User {{SSHUser}
+		//   ProxyCommand {{GHExec}} cs ssh -c {{Name}} --stdio
+		//
+		// EscapedRef is included in the name to help distinguish between codespaces
+		// when tab-completing ssh hostnames. '/' characters in EscapedRef are
+		// flattened to '-' to prevent problems with tab completion or when the
+		// hostname appears in ControlMaster socket paths.
+		type codespaceSSHConfig struct {
+			Name       string // the codespace name, passed to `ssh -c`
+			EscapedRef string // the currently checked-out branch
+			SSHUser    string // the remote ssh username
+			GHExec     string // path used for invoking the current `gh` binary
+		}
+
+		conf := codespaceSSHConfig{
+			Name:       result.codespace.Name,
+			EscapedRef: strings.ReplaceAll(result.codespace.GitStatus.Ref, "/", "-"),
+			SSHUser:    result.user,
+			GHExec:     ghExec,
+		}
+		if err := t.Execute(a.io.Out, conf); err != nil {
+			return err
+		}
+	}
+
+	return status
+}
+
 type cpOptions struct {
 	sshOptions
 	recursive bool // -r
@@ -157,7 +319,7 @@ func newCpCmd(app *App) *cobra.Command {
 	var opts cpOptions
 
 	cpCmd := &cobra.Command{
-		Use:   "cp [-e] [-r] <sources>... <dest>",
+		Use:   "cp [-e] [-r] [-- [<scp flags>...]] <sources>... <dest>",
 		Short: "Copy files between local and remote file systems",
 		Long: heredoc.Docf(`
 			The cp command copies files between the local and remote file systems.
@@ -182,6 +344,7 @@ func newCpCmd(app *App) *cobra.Command {
 			$ gh codespace cp -e README.md 'remote:/workspaces/$RepositoryName/'
 			$ gh codespace cp -e 'remote:~/*.go' ./gofiles/
 			$ gh codespace cp -e 'remote:/workspaces/myproj/go.{mod,sum}' ./gofiles/
+			$ gh codespace cp -e -- -F ~/.ssh/codespaces_config 'remote:~/*.go' ./gofiles/
 		`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return app.Copy(cmd.Context(), args, opts)
@@ -193,6 +356,7 @@ func newCpCmd(app *App) *cobra.Command {
 	cpCmd.Flags().BoolVarP(&opts.recursive, "recursive", "r", false, "Recursively copy directories")
 	cpCmd.Flags().BoolVarP(&opts.expand, "expand", "e", false, "Expand remote file names on remote shell")
 	cpCmd.Flags().StringVarP(&opts.codespace, "codespace", "c", "", "Name of the codespace")
+	cpCmd.Flags().StringVarP(&opts.profile, "profile", "p", "", "Name of the SSH profile to use")
 	return cpCmd
 }
 
@@ -205,7 +369,7 @@ func (a *App) Copy(ctx context.Context, args []string, opts cpOptions) error {
 	if opts.recursive {
 		opts.scpArgs = append(opts.scpArgs, "-r")
 	}
-	opts.scpArgs = append(opts.scpArgs, "--")
+
 	hasRemote := false
 	for _, arg := range args {
 		if rest := strings.TrimPrefix(arg, "remote:"); rest != arg {
@@ -253,7 +417,7 @@ type fileLogger struct {
 func newFileLogger(file string) (fl *fileLogger, err error) {
 	var f *os.File
 	if file == "" {
-		f, err = ioutil.TempFile("", "")
+		f, err = os.CreateTemp("", "")
 		if err != nil {
 			return nil, fmt.Errorf("failed to create tmp file: %w", err)
 		}
@@ -276,4 +440,22 @@ func (fl *fileLogger) Name() string {
 
 func (fl *fileLogger) Close() error {
 	return fl.f.Close()
+}
+
+type combinedReadWriteCloser struct {
+	io.ReadCloser
+	io.WriteCloser
+}
+
+func newReadWriteCloser(reader io.ReadCloser, writer io.WriteCloser) io.ReadWriteCloser {
+	return &combinedReadWriteCloser{reader, writer}
+}
+
+func (crwc *combinedReadWriteCloser) Close() error {
+	werr := crwc.WriteCloser.Close()
+	rerr := crwc.ReadCloser.Close()
+	if werr != nil {
+		return werr
+	}
+	return rerr
 }

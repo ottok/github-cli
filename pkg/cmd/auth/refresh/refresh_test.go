@@ -2,7 +2,7 @@ package refresh
 
 import (
 	"bytes"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -89,14 +89,13 @@ func Test_NewCmdRefresh(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 			f := &cmdutil.Factory{
-				IOStreams:  io,
-				Executable: func() string { return "/path/to/gh" },
+				IOStreams: ios,
 			}
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
-			io.SetNeverPrompt(tt.neverPrompt)
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
+			ios.SetNeverPrompt(tt.neverPrompt)
 
 			argv, err := shlex.Split(tt.cli)
 			assert.NoError(t, err)
@@ -195,7 +194,7 @@ func Test_refreshRun(t *testing.T) {
 				Hostname: "",
 			},
 			askStubs: func(as *prompt.AskStubber) {
-				as.StubOne("github.com")
+				as.StubPrompt("What account do you want to refresh auth for?").AnswerWith("github.com")
 			},
 			wantAuthArgs: authArgs{
 				hostname: "github.com",
@@ -233,18 +232,18 @@ func Test_refreshRun(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			aa := authArgs{}
-			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string) error {
+			tt.opts.AuthFlow = func(_ config.Config, _ *iostreams.IOStreams, hostname string, scopes []string, interactive bool) error {
 				aa.hostname = hostname
 				aa.scopes = scopes
 				return nil
 			}
 
-			io, _, _, _ := iostreams.Test()
+			ios, _, _, _ := iostreams.Test()
 
-			io.SetStdinTTY(!tt.nontty)
-			io.SetStdoutTTY(!tt.nontty)
+			ios.SetStdinTTY(!tt.nontty)
+			ios.SetStdoutTTY(!tt.nontty)
 
-			tt.opts.IO = io
+			tt.opts.IO = ios
 			cfg := config.NewBlankConfig()
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil
@@ -264,7 +263,7 @@ func Test_refreshRun(t *testing.T) {
 					return &http.Response{
 						Request:    req,
 						StatusCode: statusCode,
-						Body:       ioutil.NopCloser(strings.NewReader(``)),
+						Body:       io.NopCloser(strings.NewReader(``)),
 						Header: http.Header{
 							"X-Oauth-Scopes": {tt.oldScopes},
 						},
@@ -277,8 +276,7 @@ func Test_refreshRun(t *testing.T) {
 			hostsBuf := bytes.Buffer{}
 			defer config.StubWriteConfig(&mainBuf, &hostsBuf)()
 
-			as, teardown := prompt.InitAskStubber()
-			defer teardown()
+			as := prompt.NewAskStubber(t)
 			if tt.askStubs != nil {
 				tt.askStubs(as)
 			}
