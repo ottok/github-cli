@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -30,7 +31,7 @@ import (
 
 func Test_NewCmdMerge(t *testing.T) {
 	tmpFile := filepath.Join(t.TempDir(), "my-body.md")
-	err := ioutil.WriteFile(tmpFile, []byte("a body from file"), 0600)
+	err := os.WriteFile(tmpFile, []byte("a body from file"), 0600)
 	require.NoError(t, err)
 
 	tests := []struct {
@@ -150,17 +151,17 @@ func Test_NewCmdMerge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, stdin, _, _ := iostreams.Test()
-			io.SetStdoutTTY(tt.isTTY)
-			io.SetStdinTTY(tt.isTTY)
-			io.SetStderrTTY(tt.isTTY)
+			ios, stdin, _, _ := iostreams.Test()
+			ios.SetStdoutTTY(tt.isTTY)
+			ios.SetStdinTTY(tt.isTTY)
+			ios.SetStderrTTY(tt.isTTY)
 
 			if tt.stdin != "" {
 				_, _ = stdin.WriteString(tt.stdin)
 			}
 
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 
 			var opts *MergeOptions
@@ -175,8 +176,8 @@ func Test_NewCmdMerge(t *testing.T) {
 			cmd.SetArgs(argv)
 
 			cmd.SetIn(&bytes.Buffer{})
-			cmd.SetOut(ioutil.Discard)
-			cmd.SetErr(ioutil.Discard)
+			cmd.SetOut(io.Discard)
+			cmd.SetErr(io.Discard)
 
 			_, err = cmd.ExecuteC()
 			if tt.wantErr != "" {
@@ -212,13 +213,13 @@ func stubCommit(pr *api.PullRequest, oid string) {
 }
 
 func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*test.CmdOut, error) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(isTTY)
-	io.SetStdinTTY(isTTY)
-	io.SetStderrTTY(isTTY)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(isTTY)
+	ios.SetStdinTTY(isTTY)
+	ios.SetStderrTTY(isTTY)
 
 	factory := &cmdutil.Factory{
-		IOStreams: io,
+		IOStreams: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: rt}, nil
 		},
@@ -248,8 +249,8 @@ func runCommand(rt http.RoundTripper, branch string, isTTY bool, cli string) (*t
 	cmd.SetArgs(argv)
 
 	cmd.SetIn(&bytes.Buffer{})
-	cmd.SetOut(ioutil.Discard)
-	cmd.SetErr(ioutil.Discard)
+	cmd.SetOut(io.Discard)
+	cmd.SetErr(io.Discard)
 
 	_, err = cmd.ExecuteC()
 	return &test.CmdOut{
@@ -319,8 +320,9 @@ func TestPrMerge_blocked(t *testing.T) {
 		baseRepo("OWNER", "REPO", "master"),
 	)
 
-	_, cmdTeardown := run.Stub()
+	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
 	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
 	assert.EqualError(t, err, "SilentError")
@@ -331,6 +333,40 @@ func TestPrMerge_blocked(t *testing.T) {
 		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
 		To use administrator privileges to immediately merge the pull request, add the %[1]s--admin%[1]s flag.
 		`, "`"), output.Stderr())
+}
+
+func TestPrMerge_dirty(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"1",
+		&api.PullRequest{
+			ID:               "THE-ID",
+			Number:           123,
+			State:            "OPEN",
+			Title:            "The title of the PR",
+			MergeStateStatus: "DIRTY",
+			BaseRefName:      "trunk",
+			HeadRefName:      "feature",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "master", true, "pr merge 1 --merge")
+	assert.EqualError(t, err, "SilentError")
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Docf(`
+		X Pull request #123 is not mergeable: the merge commit cannot be cleanly created.
+		To have the pull request merged after all the requirements have been met, add the %[1]s--auto%[1]s flag.
+		Run the following to resolve the merge conflicts locally:
+		  gh pr checkout 123 && git fetch origin trunk && git merge origin/trunk
+	`, "`"), output.Stderr())
 }
 
 func TestPrMerge_nontty(t *testing.T) {
@@ -480,6 +516,7 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
@@ -494,6 +531,106 @@ func TestPrMerge_deleteBranch(t *testing.T) {
 	assert.Equal(t, heredoc.Doc(`
 		✓ Merged pull request #10 (Blueberries are a good fruit)
 		✓ Deleted branch blueberries and switched to branch master
+	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_nonDefault(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "fruit",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/fruit`, 0, "")
+	cs.Register(`git checkout fruit`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries and switched to branch fruit
+	`), output.Stderr())
+}
+
+func TestPrMerge_deleteBranch_checkoutNewBranch(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"",
+		&api.PullRequest{
+			ID:               "PR_10",
+			Number:           10,
+			State:            "OPEN",
+			Title:            "Blueberries are a good fruit",
+			HeadRefName:      "blueberries",
+			MergeStateStatus: "CLEAN",
+			BaseRefName:      "fruit",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	http.Register(
+		httpmock.GraphQL(`mutation PullRequestMerge\b`),
+		httpmock.GraphQLMutation(`{}`, func(input map[string]interface{}) {
+			assert.Equal(t, "PR_10", input["pullRequestId"].(string))
+			assert.Equal(t, "MERGE", input["mergeMethod"].(string))
+			assert.NotContains(t, input, "commitHeadline")
+		}))
+	http.Register(
+		httpmock.REST("DELETE", "repos/OWNER/REPO/git/refs/heads/blueberries"),
+		httpmock.StringResponse(`{}`))
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/fruit`, 1, "")
+	cs.Register(`git checkout -b fruit --track origin/fruit`, 0, "")
+	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
+	cs.Register(`git branch -D blueberries`, 0, "")
+	cs.Register(`git pull --ff-only`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, `pr merge --merge --delete-branch`)
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, heredoc.Doc(`
+		✓ Merged pull request #10 (Blueberries are a good fruit)
+		✓ Deleted branch blueberries and switched to branch fruit
 	`), output.Stderr())
 }
 
@@ -764,13 +901,16 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne(true)
 
 	output, err := runCommand(http, "blueberries", true, "pr merge 4")
@@ -780,6 +920,36 @@ func TestPrMerge_alreadyMerged(t *testing.T) {
 }
 
 func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
+	http := initFakeHTTP()
+	defer http.Verify(t)
+
+	shared.RunCommandFinder(
+		"4",
+		&api.PullRequest{
+			ID:                  "THE-ID",
+			Number:              4,
+			State:               "MERGED",
+			HeadRepositoryOwner: api.Owner{Login: "OWNER"},
+			MergeStateStatus:    "CLEAN",
+		},
+		baseRepo("OWNER", "REPO", "master"),
+	)
+
+	cs, cmdTeardown := run.Stub()
+	defer cmdTeardown(t)
+
+	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
+
+	output, err := runCommand(http, "blueberries", true, "pr merge 4 --merge")
+	if err != nil {
+		t.Fatalf("Got unexpected error running `pr merge` %s", err)
+	}
+
+	assert.Equal(t, "", output.String())
+	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
+}
+
+func TestPrMerge_alreadyMerged_nonInteractive_crossRepo(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
 
@@ -806,9 +976,8 @@ func TestPrMerge_alreadyMerged_nonInteractive(t *testing.T) {
 	}
 
 	assert.Equal(t, "", output.String())
-	assert.Equal(t, "! Pull request #4 was already merged\n", output.Stderr())
+	assert.Equal(t, "", output.Stderr())
 }
-
 func TestPRMerge_interactive(t *testing.T) {
 	http := initFakeHTTP()
 	defer http.Verify(t)
@@ -846,11 +1015,15 @@ func TestPRMerge_interactive(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)        // Merge method survey
-	as.StubOne(false)    // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(0) // Merge method survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(false) // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne("Submit") // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
@@ -900,15 +1073,19 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 	cs, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	cs.Register(`git rev-parse --verify refs/heads/master`, 0, "")
 	cs.Register(`git checkout master`, 0, "")
 	cs.Register(`git rev-parse --verify refs/heads/blueberries`, 0, "")
 	cs.Register(`git branch -D blueberries`, 0, "")
 	cs.Register(`git pull --ff-only`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)        // Merge method survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(0) // Merge method survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne("Submit") // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "-d")
@@ -924,9 +1101,9 @@ func TestPRMerge_interactiveWithDeleteBranch(t *testing.T) {
 }
 
 func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -964,17 +1141,23 @@ func TestPRMerge_interactiveSquashEditCommitMsgAndSubject(t *testing.T) {
 	_, cmdTeardown := run.Stub()
 	defer cmdTeardown(t)
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(2)                     // Merge method survey
-	as.StubOne(false)                 // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(2) // Merge method survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(false) // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne("Edit commit subject") // Confirm submit survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne("Edit commit message") // Confirm submit survey
-	as.StubOne("Submit")              // Confirm submit survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne("Submit") // Confirm submit survey
 
 	err := mergeRun(&MergeOptions{
-		IO:     io,
+		IO:     ios,
 		Editor: testEditor{},
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
@@ -1017,11 +1200,15 @@ func TestPRMerge_interactiveCancelled(t *testing.T) {
 
 	cs.Register(`git rev-parse --verify refs/heads/`, 0, "")
 
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
 
-	as.StubOne(0)        // Merge method survey
-	as.StubOne(true)     // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(0) // Merge method survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
+	as.StubOne(true) // Delete branch survey
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne("Cancel") // Confirm submit survey
 
 	output, err := runCommand(http, "blueberries", true, "")
@@ -1038,8 +1225,10 @@ func Test_mergeMethodSurvey(t *testing.T) {
 		RebaseMergeAllowed: true,
 		SquashMergeAllowed: true,
 	}
+	//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 	as, surveyTeardown := prompt.InitAskStubber()
 	defer surveyTeardown()
+	//nolint:staticcheck // SA1019: as.StubOne is deprecated: use StubPrompt
 	as.StubOne(0) // Select first option which is rebase merge
 	method, err := mergeMethodSurvey(repo)
 	assert.Nil(t, err)
@@ -1047,9 +1236,9 @@ func Test_mergeMethodSurvey(t *testing.T) {
 }
 
 func TestMergeRun_autoMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1064,7 +1253,7 @@ func TestMergeRun_autoMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
@@ -1084,9 +1273,9 @@ func TestMergeRun_autoMerge(t *testing.T) {
 }
 
 func TestMergeRun_autoMerge_directMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1102,7 +1291,7 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},
@@ -1122,9 +1311,9 @@ func TestMergeRun_autoMerge_directMerge(t *testing.T) {
 }
 
 func TestMergeRun_disableAutoMerge(t *testing.T) {
-	io, _, stdout, stderr := iostreams.Test()
-	io.SetStdoutTTY(true)
-	io.SetStderrTTY(true)
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(true)
+	ios.SetStderrTTY(true)
 
 	tr := initFakeHTTP()
 	defer tr.Verify(t)
@@ -1138,7 +1327,7 @@ func TestMergeRun_disableAutoMerge(t *testing.T) {
 	defer cmdTeardown(t)
 
 	err := mergeRun(&MergeOptions{
-		IO: io,
+		IO: ios,
 		HttpClient: func() (*http.Client, error) {
 			return &http.Client{Transport: tr}, nil
 		},

@@ -45,11 +45,11 @@ func TestNewCmdDelete(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			io, _, _, _ := iostreams.Test()
-			io.SetStdinTTY(tt.tty)
-			io.SetStdoutTTY(tt.tty)
+			ios, _, _, _ := iostreams.Test()
+			ios.SetStdinTTY(tt.tty)
+			ios.SetStdoutTTY(tt.tty)
 			f := &cmdutil.Factory{
-				IOStreams: io,
+				IOStreams: ios,
 			}
 			argv, err := shlex.Split(tt.input)
 			assert.NoError(t, err)
@@ -94,6 +94,7 @@ func Test_deleteRun(t *testing.T) {
 			askStubs: func(q *prompt.AskStubber) {
 				// TODO: survey stubber doesn't have WithValidator support
 				// so this always passes regardless of prompt input
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -108,6 +109,7 @@ func Test_deleteRun(t *testing.T) {
 			opts:       &DeleteOptions{},
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -134,6 +136,7 @@ func Test_deleteRun(t *testing.T) {
 			wantStdout: "✓ Deleted repository OWNER/REPO\n",
 			tty:        true,
 			askStubs: func(q *prompt.AskStubber) {
+				//nolint:staticcheck // SA1019: q.StubOne is deprecated: use StubPrompt
 				q.StubOne("OWNER/REPO")
 			},
 			httpStubs: func(reg *httpmock.Registry) {
@@ -147,6 +150,7 @@ func Test_deleteRun(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		//nolint:staticcheck // SA1019: prompt.InitAskStubber is deprecated: use NewAskStubber
 		q, teardown := prompt.InitAskStubber()
 		defer teardown()
 		if tt.askStubs != nil {
@@ -165,10 +169,10 @@ func Test_deleteRun(t *testing.T) {
 			return &http.Client{Transport: reg}, nil
 		}
 
-		io, _, stdout, _ := iostreams.Test()
-		io.SetStdinTTY(tt.tty)
-		io.SetStdoutTTY(tt.tty)
-		tt.opts.IO = io
+		ios, _, stdout, _ := iostreams.Test()
+		ios.SetStdinTTY(tt.tty)
+		ios.SetStdoutTTY(tt.tty)
+		tt.opts.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			defer reg.Verify(t)

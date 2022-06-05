@@ -6,9 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
-	"path"
+	"os"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
@@ -86,6 +86,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			}
 			return nil
 		},
+		Aliases: []string{"new"},
 		RunE: func(c *cobra.Command, args []string) error {
 			opts.Filenames = args
 
@@ -147,7 +148,9 @@ func createRun(opts *CreateOptions) error {
 		return err
 	}
 
+	opts.IO.StartProgressIndicator()
 	gist, err := createGist(httpClient, host, opts.Description, opts.Public, files)
+	opts.IO.StopProgressIndicator()
 	if err != nil {
 		var httpError api.HTTPError
 		if errors.As(err, &httpError) {
@@ -192,7 +195,7 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 			} else {
 				filename = fmt.Sprintf("gistfile%d.txt", i)
 			}
-			content, err = ioutil.ReadAll(stdin)
+			content, err = io.ReadAll(stdin)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read from stdin: %w", err)
 			}
@@ -210,12 +213,12 @@ func processFiles(stdin io.ReadCloser, filenameOverride string, filenames []stri
 				return nil, fmt.Errorf("failed to upload %s: binary file not supported", f)
 			}
 
-			content, err = ioutil.ReadFile(f)
+			content, err = os.ReadFile(f)
 			if err != nil {
 				return fs, fmt.Errorf("failed to read file %s: %w", f, err)
 			}
 
-			filename = path.Base(f)
+			filename = filepath.Base(f)
 		}
 
 		fs[filename] = &shared.GistFile{

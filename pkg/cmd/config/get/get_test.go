@@ -107,14 +107,16 @@ func Test_getRun(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		io, _, stdout, stderr := iostreams.Test()
-		tt.input.IO = io
+		ios, _, stdout, stderr := iostreams.Test()
+		tt.input.IO = ios
 
 		t.Run(tt.name, func(t *testing.T) {
 			err := getRun(tt.input)
 			assert.NoError(t, err)
 			assert.Equal(t, tt.stdout, stdout.String())
 			assert.Equal(t, tt.stderr, stderr.String())
+			_, err = tt.input.Config.GetOrDefault("", "_written")
+			assert.Error(t, err)
 			_, err = tt.input.Config.Get("", "_written")
 			assert.Error(t, err)
 		})

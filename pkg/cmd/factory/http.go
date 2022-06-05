@@ -3,7 +3,7 @@ package factory
 import (
 	"fmt"
 	"net/http"
-	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -11,6 +11,7 @@ import (
 	"github.com/cli/cli/v2/internal/ghinstance"
 	"github.com/cli/cli/v2/internal/httpunix"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	"github.com/cli/cli/v2/utils"
 )
 
 var timezoneNames = map[int]string{
@@ -83,8 +84,8 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 		}))
 	}
 
-	if verbose := os.Getenv("DEBUG"); verbose != "" {
-		logTraffic := strings.Contains(verbose, "api")
+	if isVerbose, debugValue := utils.IsDebugEnabled(); isVerbose {
+		logTraffic := strings.Contains(debugValue, "api")
 		opts = append(opts, api.VerboseLog(io.ErrOut, logTraffic, io.IsStderrTTY()))
 	}
 
@@ -107,6 +108,7 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 			}
 			return "", nil
 		}),
+		api.ExtractHeader("X-GitHub-SSO", &ssoHeader),
 	)
 
 	if setAccept {
@@ -124,6 +126,22 @@ func NewHTTPClient(io *iostreams.IOStreams, cfg configGetter, appVersion string,
 	}
 
 	return api.NewHTTPClient(opts...), nil
+}
+
+var ssoHeader string
+var ssoURLRE = regexp.MustCompile(`\burl=([^;]+)`)
+
+// SSOURL returns the URL of a SAML SSO challenge received by the server for clients that use ExtractHeader
+// to extract the value of the "X-GitHub-SSO" response header.
+func SSOURL() string {
+	if ssoHeader == "" {
+		return ""
+	}
+	m := ssoURLRE.FindStringSubmatch(ssoHeader)
+	if m == nil {
+		return ""
+	}
+	return m[1]
 }
 
 func getHost(r *http.Request) string {

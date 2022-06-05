@@ -27,24 +27,25 @@ type CreateOptions struct {
 	Config     func() (config.Config, error)
 	IO         *iostreams.IOStreams
 
-	Name              string
-	Description       string
-	Homepage          string
-	Team              string
-	Template          string
-	Public            bool
-	Private           bool
-	Internal          bool
-	Visibility        string
-	Push              bool
-	Clone             bool
-	Source            string
-	Remote            string
-	GitIgnoreTemplate string
-	LicenseTemplate   string
-	DisableIssues     bool
-	DisableWiki       bool
-	Interactive       bool
+	Name               string
+	Description        string
+	Homepage           string
+	Team               string
+	Template           string
+	Public             bool
+	Private            bool
+	Internal           bool
+	Visibility         string
+	Push               bool
+	Clone              bool
+	Source             string
+	Remote             string
+	GitIgnoreTemplate  string
+	LicenseTemplate    string
+	DisableIssues      bool
+	DisableWiki        bool
+	Interactive        bool
+	IncludeAllBranches bool
 }
 
 func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Command {
@@ -68,12 +69,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			To create a remote repository non-interactively, supply the repository name and one of %[1]s--public%[1]s, %[1]s--private%[1]s, or %[1]s--internal%[1]s.
 			Pass %[1]s--clone%[1]s to clone the new repository locally.
 
-			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s. 
-			By default, the remote repository name will be the name of the source directory. 
+			To create a remote repository from an existing local repository, specify the source directory with %[1]s--source%[1]s.
+			By default, the remote repository name will be the name of the source directory.
 			Pass %[1]s--push%[1]s to push any local commits to the new repository.
 		`, "`"),
 		Example: heredoc.Doc(`
-			# create a repository interactively 
+			# create a repository interactively
 			gh repo create
 
 			# create a new remote repository and clone it locally
@@ -82,7 +83,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			# create a remote repository from the current directory
 			gh repo create my-project --private --source=. --remote=upstream
 		`),
-		Args: cobra.MaximumNArgs(1),
+		Args:    cobra.MaximumNArgs(1),
+		Aliases: []string{"new"},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if len(args) > 0 {
 				opts.Name = args[0]
@@ -143,6 +145,10 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
 			}
 
+			if opts.Template == "" && opts.IncludeAllBranches {
+				return cmdutil.FlagErrorf("the `--include-all-branches` option is only supported when using `--template`")
+			}
+
 			if runF != nil {
 				return runF(opts)
 			}
@@ -165,6 +171,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd.Flags().BoolVarP(&opts.Clone, "clone", "c", false, "Clone the new repository to the current directory")
 	cmd.Flags().BoolVar(&opts.DisableIssues, "disable-issues", false, "Disable issues in the new repository")
 	cmd.Flags().BoolVar(&opts.DisableWiki, "disable-wiki", false, "Disable wiki in the new repository")
+	cmd.Flags().BoolVar(&opts.IncludeAllBranches, "include-all-branches", false, "Include all branches from template repository")
 
 	// deprecated flags
 	cmd.Flags().BoolP("confirm", "y", false, "Skip the confirmation prompt")
@@ -294,16 +301,17 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	input := repoCreateInput{
-		Name:              repoToCreate.RepoName(),
-		Visibility:        opts.Visibility,
-		OwnerLogin:        repoToCreate.RepoOwner(),
-		TeamSlug:          opts.Team,
-		Description:       opts.Description,
-		HomepageURL:       opts.Homepage,
-		HasIssuesEnabled:  !opts.DisableIssues,
-		HasWikiEnabled:    !opts.DisableWiki,
-		GitIgnoreTemplate: opts.GitIgnoreTemplate,
-		LicenseTemplate:   opts.LicenseTemplate,
+		Name:               repoToCreate.RepoName(),
+		Visibility:         opts.Visibility,
+		OwnerLogin:         repoToCreate.RepoOwner(),
+		TeamSlug:           opts.Team,
+		Description:        opts.Description,
+		HomepageURL:        opts.Homepage,
+		HasIssuesEnabled:   !opts.DisableIssues,
+		HasWikiEnabled:     !opts.DisableWiki,
+		GitIgnoreTemplate:  opts.GitIgnoreTemplate,
+		LicenseTemplate:    opts.LicenseTemplate,
+		IncludeAllBranches: opts.IncludeAllBranches,
 	}
 
 	var templateRepoMainBranch string
@@ -361,7 +369,7 @@ func createFromScratch(opts *CreateOptions) error {
 	}
 
 	if opts.Clone {
-		protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+		protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 		if err != nil {
 			return err
 		}
@@ -498,7 +506,7 @@ func createFromLocal(opts *CreateOptions) error {
 		fmt.Fprintln(stdout, repo.URL)
 	}
 
-	protocol, err := cfg.Get(repo.RepoHost(), "git_protocol")
+	protocol, err := cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
 	if err != nil {
 		return err
 	}
@@ -534,10 +542,10 @@ func createFromLocal(opts *CreateOptions) error {
 		return err
 	}
 
-	// don't prompt for push if there's no commits
+	// don't prompt for push if there are no commits
 	if opts.Interactive && committed {
 		pushQuestion := &survey.Confirm{
-			Message: fmt.Sprintf(`Would you like to push commits from the current branch to the %q?`, baseRemote),
+			Message: fmt.Sprintf(`Would you like to push commits from the current branch to %q?`, baseRemote),
 			Default: true,
 		}
 		err = prompt.SurveyAskOne(pushQuestion, &opts.Push)

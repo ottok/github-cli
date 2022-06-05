@@ -27,9 +27,10 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	}
 
 	cmd := &cobra.Command{
-		Use:   "list",
-		Short: "Lists GPG keys in your GitHub account",
-		Args:  cobra.ExactArgs(0),
+		Use:     "list",
+		Short:   "Lists GPG keys in your GitHub account",
+		Aliases: []string{"ls"},
+		Args:    cobra.ExactArgs(0),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if runF != nil {
 				return runF(opts)
@@ -69,8 +70,7 @@ func listRun(opts *ListOptions) error {
 	}
 
 	if len(gpgKeys) == 0 {
-		fmt.Fprintln(opts.IO.ErrOut, "No GPG keys present in GitHub account.")
-		return cmdutil.SilentError
+		return cmdutil.NewNoResultsError("no GPG keys present in the GitHub account")
 	}
 
 	t := utils.NewTablePrinter(opts.IO)

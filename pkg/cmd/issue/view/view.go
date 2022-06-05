@@ -195,7 +195,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	fmt.Fprintf(out, "%s #%d\n", cs.Bold(issue.Title), issue.Number)
 	fmt.Fprintf(out,
 		"%s • %s opened %s • %s\n",
-		issueStateTitleWithColor(cs, issue.State),
+		issueStateTitleWithColor(cs, issue),
 		issue.Author.Login,
 		utils.FuzzyAgo(ago),
 		utils.Pluralize(issue.Comments.TotalCount, "comment"),
@@ -231,8 +231,7 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	if issue.Body == "" {
 		md = fmt.Sprintf("\n  %s\n\n", cs.Gray("No description provided"))
 	} else {
-		style := markdown.GetStyle(opts.IO.TerminalTheme())
-		md, err = markdown.Render(issue.Body, style)
+		md, err = markdown.Render(issue.Body, markdown.WithIO(opts.IO))
 		if err != nil {
 			return err
 		}
@@ -255,9 +254,13 @@ func printHumanIssuePreview(opts *ViewOptions, issue *api.Issue) error {
 	return nil
 }
 
-func issueStateTitleWithColor(cs *iostreams.ColorScheme, state string) string {
-	colorFunc := cs.ColorFromString(prShared.ColorForState(state))
-	return colorFunc(strings.Title(strings.ToLower(state)))
+func issueStateTitleWithColor(cs *iostreams.ColorScheme, issue *api.Issue) string {
+	colorFunc := cs.ColorFromString(prShared.ColorForIssueState(*issue))
+	state := "Open"
+	if issue.State == "CLOSED" {
+		state = "Closed"
+	}
+	return colorFunc(state)
 }
 
 func issueAssigneeList(issue api.Issue) string {

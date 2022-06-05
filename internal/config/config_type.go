@@ -9,7 +9,10 @@ import (
 // This interface describes interacting with some persistent configuration for gh.
 type Config interface {
 	Get(string, string) (string, error)
+	GetOrDefault(string, string) (string, error)
 	GetWithSource(string, string) (string, string, error)
+	GetOrDefaultWithSource(string, string) (string, string, error)
+	Default(string) string
 	Set(string, string, string) error
 	UnsetHost(string)
 	Hosts() ([]string, error)
@@ -18,6 +21,7 @@ type Config interface {
 	Aliases() (*AliasConfig, error)
 	CheckWriteable(string, string) error
 	Write() error
+	WriteHosts() error
 }
 
 type ConfigOption struct {
@@ -52,7 +56,7 @@ var configOptions = []ConfigOption{
 	},
 	{
 		Key:          "http_unix_socket",
-		Description:  "the path to a unix socket through which to make HTTP connection",
+		Description:  "the path to a Unix socket through which to make an HTTP connection",
 		DefaultValue: "",
 	},
 	{

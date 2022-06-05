@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -95,6 +94,22 @@ func VerboseLog(out io.Writer, logTraffic bool, colorize bool) ClientOption {
 func ReplaceTripper(tr http.RoundTripper) ClientOption {
 	return func(http.RoundTripper) http.RoundTripper {
 		return tr
+	}
+}
+
+// ExtractHeader extracts a named header from any response received by this client and, if non-blank, saves
+// it to dest.
+func ExtractHeader(name string, dest *string) ClientOption {
+	return func(tr http.RoundTripper) http.RoundTripper {
+		return &funcTripper{roundTrip: func(req *http.Request) (*http.Response, error) {
+			res, err := tr.RoundTrip(req)
+			if err == nil {
+				if value := res.Header.Get(name); value != "" {
+					*dest = value
+				}
+			}
+			return res, err
+		}}
 	}
 }
 
@@ -220,7 +235,23 @@ func ScopesSuggestion(resp *http.Response) string {
 	for _, s := range strings.Split(tokenHasScopes, ",") {
 		s = strings.TrimSpace(s)
 		gotScopes[s] = struct{}{}
-		if strings.HasPrefix(s, "admin:") {
+
+		// Certain scopes may be grouped under a single "top-level" scope. The following branch
+		// statements include these grouped/implied scopes when the top-level scope is encountered.
+		// See https://docs.github.com/en/developers/apps/building-oauth-apps/scopes-for-oauth-apps.
+		if s == "repo" {
+			gotScopes["repo:status"] = struct{}{}
+			gotScopes["repo_deployment"] = struct{}{}
+			gotScopes["public_repo"] = struct{}{}
+			gotScopes["repo:invite"] = struct{}{}
+			gotScopes["security_events"] = struct{}{}
+		} else if s == "user" {
+			gotScopes["read:user"] = struct{}{}
+			gotScopes["user:email"] = struct{}{}
+			gotScopes["user:follow"] = struct{}{}
+		} else if s == "codespace" {
+			gotScopes["codespace:secrets"] = struct{}{}
+		} else if strings.HasPrefix(s, "admin:") {
 			gotScopes["read:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 			gotScopes["write:"+strings.TrimPrefix(s, "admin:")] = struct{}{}
 		} else if strings.HasPrefix(s, "write:") {
@@ -284,39 +315,54 @@ func graphQLClient(h *http.Client, hostname string) *graphql.Client {
 
 // REST performs a REST request and parses the response.
 func (c Client) REST(hostname string, method string, p string, body io.Reader, data interface{}) error {
+	_, err := c.RESTWithNext(hostname, method, p, body, data)
+	return err
+}
+
+func (c Client) RESTWithNext(hostname string, method string, p string, body io.Reader, data interface{}) (string, error) {
 	req, err := http.NewRequest(method, restURL(hostname, p), body)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
 
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	success := resp.StatusCode >= 200 && resp.StatusCode < 300
 	if !success {
-		return HandleHTTPError(resp)
+		return "", HandleHTTPError(resp)
 	}
 
 	if resp.StatusCode == http.StatusNoContent {
-		return nil
+		return "", nil
 	}
 
-	b, err := ioutil.ReadAll(resp.Body)
+	b, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return err
+		return "", err
 	}
+
 	err = json.Unmarshal(b, &data)
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	var next string
+	for _, m := range linkRE.FindAllStringSubmatch(resp.Header.Get("Link"), -1) {
+		if len(m) > 2 && m[2] == "next" {
+			next = m[1]
+		}
+	}
+
+	return next, nil
 }
+
+var linkRE = regexp.MustCompile(`<([^>]+)>;\s*rel="([^"]+)"`)
 
 func restURL(hostname string, pathOrURL string) string {
 	if strings.HasPrefix(pathOrURL, "https://") || strings.HasPrefix(pathOrURL, "http://") {
@@ -332,7 +378,7 @@ func handleResponse(resp *http.Response, data interface{}) error {
 		return HandleHTTPError(resp)
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -361,7 +407,7 @@ func HandleHTTPError(resp *http.Response) error {
 		return httpError
 	}
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		httpError.Message = err.Error()
 		return httpError
