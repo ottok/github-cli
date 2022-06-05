@@ -1,3 +1,10 @@
+gh (2.11.3+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.11.3+dfsg1
+  * Bump versioned dependencies as per go.mod
+
+ -- Anthony Fok <foka@debian.org>  Sun, 05 Jun 2022 07:57:15 -0600
+
 gh (2.4.0+dfsg1-4) unstable; urgency=medium
 
   * Revert "Add diversion for /usr/bin/gh to allow concurrent install
