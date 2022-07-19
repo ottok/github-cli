@@ -119,13 +119,11 @@ func listRun(opts *ListOptions) error {
 		return err
 	}
 
-	host, err := cfg.DefaultHost()
-	if err != nil {
-		return err
-	}
+	host, _ := cfg.DefaultHost()
 
 	if opts.Detector == nil {
-		opts.Detector = fd.NewDetector(httpClient, host)
+		cachedClient := api.NewCachedHTTPClient(httpClient, time.Hour*24)
+		opts.Detector = fd.NewDetector(cachedClient, host)
 	}
 	features, err := opts.Detector.RepositoryFeatures()
 	if err != nil {
