@@ -1,3 +1,10 @@
+gh (2.14.4+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.14.4+dfsg1'
+  * Update versioned dependency on golang-github-cli-go-gh-dev as per go.mod
+
+ -- Anthony Fok <foka@debian.org>  Thu, 11 Aug 2022 19:05:26 -0600
+
 gh (2.14.2+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.14.2+dfsg1
