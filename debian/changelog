@@ -1,3 +1,19 @@
+gh (2.14.7+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.14.7+dfsg1
+  * Update versioned dependencies as per go.mod
+  * Refresh 0001-set-defaultEditor-as-per-debian-policy.patch
+  * Apply 0002-Bump-github.com-spf13-cobra-from-v1.4.0-to-v1.5.0.patch:
+    Cobra v1.5.0 contains a fix for the zsh autocompletion #compdef line
+    to only complete <command>, not _<command> the completion function itself,
+    See https://github.com/cli/cli/pull/6196.  TestNewCmdCompletion for zsh,
+    which checks that #compdef line, is updated accordingly.
+    Fixes "FTBFS: FAIL: TestNewCmdCompletion/zsh_completion"
+    with golang-github-spf13-cobra-dev (>= 1.5.0).
+    Thanks to Shengjing Zhu for reporting the issue. (Closes: #1019137)
+
+ -- Anthony Fok <foka@debian.org>  Mon, 05 Sep 2022 03:25:09 -0600
+
 gh (2.14.4+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.14.4+dfsg1'
