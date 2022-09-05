@@ -9,6 +9,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/authflow"
 	"github.com/cli/cli/v2/internal/config"
+	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -20,6 +21,7 @@ type RefreshOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	httpClient *http.Client
+	Prompter   prompter.Prompter
 
 	MainExecutable string
 
@@ -39,6 +41,7 @@ func NewCmdRefresh(f *cmdutil.Factory, runF func(*RefreshOptions) error) *cobra.
 			return err
 		},
 		httpClient: &http.Client{},
+		Prompter:   f.Prompter,
 	}
 
 	cmd := &cobra.Command{
@@ -94,6 +97,7 @@ func refreshRun(opts *RefreshOptions) error {
 		if len(candidates) == 1 {
 			hostname = candidates[0]
 		} else {
+			//nolint:staticcheck // SA1019: prompt.SurveyAskOne is deprecated: use Prompter
 			err := prompt.SurveyAskOne(&survey.Select{
 				Message: "What account do you want to refresh auth for?",
 				Options: candidates,
@@ -137,6 +141,7 @@ func refreshRun(opts *RefreshOptions) error {
 
 	credentialFlow := &shared.GitCredentialFlow{
 		Executable: opts.MainExecutable,
+		Prompter:   opts.Prompter,
 	}
 	gitProtocol, _ := cfg.GetOrDefault(hostname, "git_protocol")
 	if opts.Interactive && gitProtocol == "https" {
