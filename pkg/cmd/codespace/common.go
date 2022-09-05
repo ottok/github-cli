@@ -13,6 +13,7 @@ import (
 
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/AlecAivazis/survey/v2/terminal"
+	"github.com/cli/cli/v2/internal/browser"
 	"github.com/cli/cli/v2/internal/codespaces"
 	"github.com/cli/cli/v2/internal/codespaces/api"
 	"github.com/cli/cli/v2/pkg/iostreams"
@@ -21,10 +22,6 @@ import (
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
 )
-
-type browser interface {
-	Browse(string) error
-}
 
 type executable interface {
 	Executable() string
@@ -35,10 +32,10 @@ type App struct {
 	apiClient  apiClient
 	errLogger  *log.Logger
 	executable executable
-	browser    browser
+	browser    browser.Browser
 }
 
-func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser) *App {
+func NewApp(io *iostreams.IOStreams, exe executable, apiClient apiClient, browser browser.Browser) *App {
 	errLogger := log.New(io.ErrOut, "", 0)
 
 	return &App{
@@ -115,7 +112,7 @@ type apiClient interface {
 	CreateCodespace(ctx context.Context, params *api.CreateCodespaceParams) (*api.Codespace, error)
 	EditCodespace(ctx context.Context, codespaceName string, params *api.EditCodespaceParams) (*api.Codespace, error)
 	GetRepository(ctx context.Context, nwo string) (*api.Repository, error)
-	AuthorizedKeys(ctx context.Context, user string) ([]byte, error)
+	AuthorizedKeys(ctx context.Context, user string) ([]string, error)
 	GetCodespacesMachines(ctx context.Context, repoID int, branch, location string) ([]*api.Machine, error)
 	GetCodespaceRepositoryContents(ctx context.Context, codespace *api.Codespace, path string) ([]byte, error)
 	ListDevContainers(ctx context.Context, repoID int, branch string, limit int) (devcontainers []api.DevContainerEntry, err error)
