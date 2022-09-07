@@ -11,7 +11,7 @@ else
 endif
 
 DEBIAN_VERSION := $(shell dpkg-parsechangelog --show-field Version)
-BUILD_VERSION := $(shell echo "$(DEBIAN_VERSION)" | sed 's/-.*//')
+BUILD_VERSION := $(shell echo "$(DEBIAN_VERSION)" | sed 's/\(+dfsg[0-9]*\)\?-.*//')
 VENDOR := $(shell . /etc/os-release; echo $$ID | sed 's/^./\u&/')
 BUILD_DATE += $(VENDOR) $(DEBIAN_VERSION)
 
