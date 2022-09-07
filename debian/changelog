@@ -1,3 +1,15 @@
+gh (2.15.0+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.15.0+dfsg1
+  * Bump dependency: golang-github-shurcool-githubv4-dev
+    (>= 0.0~git20220115.a14260e)
+  * Remove 0002-Bump-github.com-spf13-cobra-from-v1.4.0-to-v1.5.0.patch
+    which has been applied upstream
+  * debian/rules: Fix "gh version" changelogURL
+    by removing +dfsg1 from build.Version in LDFLAGS
+
+ -- Anthony Fok <foka@debian.org>  Tue, 06 Sep 2022 19:37:43 -0600
+
 gh (2.14.7+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.14.7+dfsg1
