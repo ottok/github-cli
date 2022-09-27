@@ -9,10 +9,10 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/cli/cli/v2/internal/config"
 	"github.com/cli/cli/v2/internal/ghinstance"
-	"github.com/cli/cli/v2/internal/prompter"
 	"github.com/cli/cli/v2/pkg/cmd/auth/shared"
 	"github.com/cli/cli/v2/pkg/cmdutil"
 	"github.com/cli/cli/v2/pkg/iostreams"
+	ghAuth "github.com/cli/go-gh/pkg/auth"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ type LoginOptions struct {
 	IO         *iostreams.IOStreams
 	Config     func() (config.Config, error)
 	HttpClient func() (*http.Client, error)
-	Prompter   prompter.Prompter
+	Prompter   shared.Prompt
 
 	MainExecutable string
 
@@ -100,7 +100,7 @@ func NewCmdLogin(f *cmdutil.Factory, runF func(*LoginOptions) error) *cobra.Comm
 			}
 
 			if opts.Hostname == "" && (!opts.Interactive || opts.Web) {
-				opts.Hostname = ghinstance.Default()
+				opts.Hostname, _ = ghAuth.DefaultHost()
 			}
 
 			opts.MainExecutable = f.Executable()
