@@ -1,3 +1,10 @@
+gh (2.17.0+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.17.0+dfsg1
+  * Build-depend explicitly on golang-any (>= 2:1.18~) as per go.mod
+
+ -- Anthony Fok <foka@debian.org>  Tue, 04 Oct 2022 17:33:02 -0600
+
 gh (2.16.1+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.16.1+dfsg1
