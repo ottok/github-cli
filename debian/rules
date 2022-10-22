@@ -27,6 +27,10 @@ all:
 execute_before_dh_auto_configure:
 	mkdir -p _build/src/golang.org/x
 	ln -s $(CURDIR)/debian/go/src/github.com/cli/crypto _build/src/golang.org/x/crypto
+	mkdir -p _build/src/google.golang.org
+	ln -s $(CURDIR)/debian/go/src/google.golang.org/grpc _build/src/google.golang.org/grpc
+	mkdir -p _build/src/github.com/golang
+	ln -s $(CURDIR)/debian/go/src/github.com/golang/protobuf _build/src/github.com/golang/protobuf
 
 override_dh_auto_build:
 	@command -V go
