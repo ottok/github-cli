@@ -1,6 +1,7 @@
 package browse
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -41,11 +42,13 @@ type BrowseOptions struct {
 
 func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Command {
 	opts := &BrowseOptions{
-		Browser:          f.Browser,
-		HttpClient:       f.HttpClient,
-		IO:               f.IOStreams,
-		PathFromRepoRoot: git.PathFromRepoRoot,
-		GitClient:        &localGitClient{},
+		Browser:    f.Browser,
+		HttpClient: f.HttpClient,
+		IO:         f.IOStreams,
+		PathFromRepoRoot: func() string {
+			return f.GitClient.PathFromRoot(context.Background())
+		},
+		GitClient: &localGitClient{client: f.GitClient},
 	}
 
 	cmd := &cobra.Command{
@@ -73,7 +76,6 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 			#=> Open main.go in the main branch
 		`),
 		Annotations: map[string]string{
-			"IsCore": "true",
 			"help:arguments": heredoc.Doc(`
 				A browser location can be specified using arguments in the following format:
 				- by number for issue or pull request, e.g. "123"; or
@@ -83,6 +85,7 @@ func NewCmdBrowse(f *cmdutil.Factory, runF func(*BrowseOptions) error) *cobra.Co
 				To configure a web browser other than the default, use the BROWSER environment variable.
 			`),
 		},
+		GroupID: "core",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.BaseRepo = f.BaseRepo
 
@@ -269,14 +272,18 @@ type gitClient interface {
 	LastCommit() (*git.Commit, error)
 }
 
-type localGitClient struct{}
+type localGitClient struct {
+	client *git.Client
+}
 
 type remoteGitClient struct {
 	repo       func() (ghrepo.Interface, error)
 	httpClient func() (*http.Client, error)
 }
 
-func (gc *localGitClient) LastCommit() (*git.Commit, error) { return git.LastCommit() }
+func (gc *localGitClient) LastCommit() (*git.Commit, error) {
+	return gc.client.LastCommit(context.Background())
+}
 
 func (gc *remoteGitClient) LastCommit() (*git.Commit, error) {
 	httpClient, err := gc.httpClient()

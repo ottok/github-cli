@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -131,7 +130,7 @@ type portInfo struct {
 }
 
 func (pi *portInfo) BrowseURL() string {
-	return fmt.Sprintf("https://%s-%d.githubpreview.dev", pi.codespace.Name, pi.Port.SourcePort)
+	return fmt.Sprintf("https://%s-%d.preview.app.github.dev", pi.codespace.Name, pi.Port.SourcePort)
 }
 
 func (pi *portInfo) Label() string {
@@ -390,7 +389,7 @@ func (a *App) ForwardPorts(ctx context.Context, codespaceName string, ports []st
 	for _, pair := range portPairs {
 		pair := pair
 		group.Go(func() error {
-			listen, err := net.Listen("tcp", fmt.Sprintf(":%d", pair.local))
+			listen, _, err := codespaces.ListenTCP(pair.local)
 			if err != nil {
 				return err
 			}
