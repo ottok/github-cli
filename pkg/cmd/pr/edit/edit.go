@@ -50,6 +50,9 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 
 			Without an argument, the pull request that belongs to the current branch
 			is selected.
+
+			Editing a pull request's projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
 		`),
 		Example: heredoc.Doc(`
 			$ gh pr edit 23 --title "I found a bug" --body "Nothing works"
@@ -151,7 +154,7 @@ func NewCmdEdit(f *cmdutil.Factory, runF func(*EditOptions) error) *cobra.Comman
 func editRun(opts *EditOptions) error {
 	findOptions := shared.FindOptions{
 		Selector: opts.SelectorArg,
-		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "milestone"},
+		Fields:   []string{"id", "url", "title", "body", "baseRefName", "reviewRequests", "assignees", "labels", "projectCards", "projectItems", "milestone"},
 	}
 	pr, repo, err := opts.Finder.Find(findOptions)
 	if err != nil {
@@ -166,7 +169,12 @@ func editRun(opts *EditOptions) error {
 	editable.Reviewers.Default = pr.ReviewRequests.Logins()
 	editable.Assignees.Default = pr.Assignees.Logins()
 	editable.Labels.Default = pr.Labels.Names()
-	editable.Projects.Default = pr.ProjectCards.ProjectNames()
+	editable.Projects.Default = append(pr.ProjectCards.ProjectNames(), pr.ProjectItems.ProjectTitles()...)
+	projectItems := map[string]string{}
+	for _, n := range pr.ProjectItems.Nodes {
+		projectItems[n.Project.ID] = n.ID
+	}
+	editable.Projects.ProjectItems = projectItems
 	if pr.Milestone != nil {
 		editable.Milestone.Default = pr.Milestone.Title
 	}

@@ -23,6 +23,7 @@ type CreateOptions struct {
 	IO         *iostreams.IOStreams
 	BaseRepo   func() (ghrepo.Interface, error)
 	Browser    browser.Browser
+	Prompter   prShared.Prompt
 
 	RootDirOverride string
 
@@ -46,6 +47,7 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 		HttpClient: f.HttpClient,
 		Config:     f.Config,
 		Browser:    f.Browser,
+		Prompter:   f.Prompter,
 	}
 
 	var bodyFile string
@@ -53,6 +55,12 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 	cmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create a new issue",
+		Long: heredoc.Doc(`
+			Create an issue on GitHub.
+
+			Adding an issue to projects requires authorization with the "project" scope.
+			To authorize, run "gh auth refresh -s project".
+		`),
 		Example: heredoc.Doc(`
 			$ gh issue create --title "I found a bug" --body "Nothing works"
 			$ gh issue create --label "bug,help wanted"
@@ -152,7 +160,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 	}
 
-	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.RootDirOverride, !opts.HasRepoOverride, false)
+	tpl := shared.NewTemplateManager(httpClient, baseRepo, opts.Prompter, opts.RootDirOverride, !opts.HasRepoOverride, false)
 
 	if opts.WebMode {
 		var openURL string
@@ -194,16 +202,10 @@ func createRun(opts *CreateOptions) (err error) {
 	var openURL string
 
 	if opts.Interactive {
-		var editorCommand string
-		editorCommand, err = cmdutil.DetermineEditor(opts.Config)
-		if err != nil {
-			return
-		}
-
 		defer prShared.PreserveInput(opts.IO, &tb, &err)()
 
 		if opts.Title == "" {
-			err = prShared.TitleSurvey(&tb)
+			err = prShared.TitleSurvey(opts.Prompter, &tb)
 			if err != nil {
 				return
 			}
@@ -227,7 +229,7 @@ func createRun(opts *CreateOptions) (err error) {
 				}
 			}
 
-			err = prShared.BodySurvey(&tb, templateContent, editorCommand)
+			err = prShared.BodySurvey(opts.Prompter, &tb, templateContent)
 			if err != nil {
 				return
 			}
@@ -239,7 +241,7 @@ func createRun(opts *CreateOptions) (err error) {
 		}
 
 		allowPreview := !tb.HasMetadata() && prShared.ValidURL(openURL)
-		action, err = prShared.ConfirmIssueSubmission(allowPreview, repo.ViewerCanTriage())
+		action, err = prShared.ConfirmIssueSubmission(opts.Prompter, allowPreview, repo.ViewerCanTriage())
 		if err != nil {
 			err = fmt.Errorf("unable to confirm: %w", err)
 			return
@@ -257,7 +259,7 @@ func createRun(opts *CreateOptions) (err error) {
 				return
 			}
 
-			action, err = prShared.ConfirmIssueSubmission(!tb.HasMetadata(), false)
+			action, err = prShared.ConfirmIssueSubmission(opts.Prompter, !tb.HasMetadata(), false)
 			if err != nil {
 				return
 			}
