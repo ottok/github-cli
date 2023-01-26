@@ -1,3 +1,13 @@
+gh (2.22.0+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.22.0+dfsg1
+  * Update versioned dependencies as per go.mod
+  * Bump Standards-Version to 4.6.2 (no change)
+  * Set GITHUB_ACTIONS to true to skip flaky tests;
+    see https://github.com/cli/cli/discussions/6858
+
+ -- Anthony Fok <foka@debian.org>  Thu, 26 Jan 2023 04:21:58 -0700
+
 gh (2.18.1+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.18.1+dfsg1
