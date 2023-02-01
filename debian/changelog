@@ -1,3 +1,9 @@
+gh (2.22.1+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.22.1+dfsg1
+
+ -- Anthony Fok <foka@debian.org>  Wed, 01 Feb 2023 11:47:51 -0700
+
 gh (2.22.0+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.22.0+dfsg1
