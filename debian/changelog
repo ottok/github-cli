@@ -1,3 +1,15 @@
+gh (2.23.0+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.23.0+dfsg1
+  * Bump build-dependencies according to go.mod:
+    - golang-github-cli-oauth-dev (>= 1.0.1)
+    - golang-github-joho-godotenv-dev (>= 1.5.1)
+  * Replace github.com/henvic/httpretty with github.com/mislav/httpretty
+    temporarily, as per go.mod, to "Avoid mangling response bodies of unknown
+    length"; see https://github.com/henvic/httpretty/pull/17
+
+ -- Anthony Fok <foka@debian.org>  Mon, 27 Feb 2023 12:41:45 -0700
+
 gh (2.22.1+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.22.1+dfsg1
