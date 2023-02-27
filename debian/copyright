@@ -18,8 +18,17 @@ Copyright: 2009 The Go Authors
 License: BSD-3-Clause
 Comment:
  This is github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
- which is a temporary fork to replace golang.org/x/crypto for
+ which is a temporary fork replacing golang.org/x/crypto for
  "ssh: support RSA SHA-2 (RFC8332) signatures".
+
+Files: debian/go/src/github.com/mislav/httpretty/*
+Copyright: 2020 Henrique Vicente
+License: Expat
+Comment:
+ This is github.com/mislav/httpretty v0.1.1-0.20230202151216-d31343e0d884
+ which is a temporary fork replacing github.com/henvic/httpretty to
+ "Avoid mangling response bodies of unknown length".
+ See https://github.com/henvic/httpretty/pull/17
 
 Files: debian/go/src/github.com/golang/protobuf/*
 Copyright: 2008-2016, The Go Authors.

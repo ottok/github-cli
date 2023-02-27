@@ -34,6 +34,8 @@ execute_before_dh_auto_configure:
 	ln -s $(CURDIR)/debian/go/src/google.golang.org/grpc _build/src/google.golang.org/grpc
 	mkdir -p _build/src/github.com/golang
 	ln -s $(CURDIR)/debian/go/src/github.com/golang/protobuf _build/src/github.com/golang/protobuf
+	mkdir -p _build/src/github.com/henvic
+	ln -s $(CURDIR)/debian/go/src/github.com/mislav/httpretty _build/src/github.com/henvic/httpretty
 
 override_dh_auto_build:
 	@command -V go
