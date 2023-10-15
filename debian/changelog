@@ -1,3 +1,10 @@
+gh (2.30.0-1) unstable; urgency=medium
+
+  * New upstream version 2.30.0
+  * Bump versioned dependencies as per go.mod
+
+ -- Anthony Fok <foka@debian.org>  Sun, 15 Oct 2023 03:30:04 -0600
+
 gh (2.27.0+dfsg1-1) unstable; urgency=medium
 
   * New upstream version 2.27.0+dfsg1
