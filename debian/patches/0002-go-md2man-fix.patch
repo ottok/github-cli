@@ -1,0 +1,49 @@
+From 46a7042b88c2787124dffce19fdf4d71840d6856 Mon Sep 17 00:00:00 2001
+From: Mikel Olasagasti Uranga <mikel@olasagasti.info>
+Date: Wed, 18 Oct 2023 09:17:20 +0200
+Subject: [PATCH] Bump cpuguy83/go-md2man from 2.0.1 to 2.0.3 (#8209)
+
+Version 2.0.3 introduces a fix in PR
+https://github.com/cpuguy83/go-md2man/pull/105 that breaks a test for
+gen-doc, thus requires a small change in the test.
+---
+ cmd/gen-docs/main_test.go | 2 +-
+ go.mod                    | 2 +-
+ go.sum                    | 2 ++
+ 3 files changed, 4 insertions(+), 2 deletions(-)
+
+--- a/cmd/gen-docs/main_test.go
++++ b/cmd/gen-docs/main_test.go
+@@ -18,7 +18,7 @@
+ 	if err != nil {
+ 		t.Fatalf("error reading `gh-issue-create.1`: %v", err)
+ 	}
+-	if !strings.Contains(string(manPage), `\fB\fCgh issue create`) {
++	if !strings.Contains(string(manPage), `\fBgh issue create`) {
+ 		t.Fatal("man page corrupted")
+ 	}
+ 
+--- a/go.mod
++++ b/go.mod
+@@ -12,7 +12,7 @@
+ 	github.com/cli/go-gh/v2 v2.0.0
+ 	github.com/cli/oauth v1.0.1
+ 	github.com/cli/safeexec v1.0.1
+-	github.com/cpuguy83/go-md2man/v2 v2.0.2
++	github.com/cpuguy83/go-md2man/v2 v2.0.3
+ 	github.com/creack/pty v1.1.18
+ 	github.com/gabriel-vasile/mimetype v1.4.2
+ 	github.com/gdamore/tcell/v2 v2.5.4
+--- a/go.sum
++++ b/go.sum
+@@ -73,8 +73,8 @@
+ github.com/cli/shurcooL-graphql v0.0.3/go.mod h1:tlrLmw/n5Q/+4qSvosT+9/W5zc8ZMjnJeYBxSdb4nWA=
+ github.com/client9/misspell v0.3.4/go.mod h1:qj6jICC3Q7zFZvVWo7KLAzC3yx5G7kyvSDkc90ppPyw=
+ github.com/cncf/udpa/go v0.0.0-20191209042840-269d4d468f6f/go.mod h1:M8M6+tZqaGXZJjfX53e64911xZQV5JYwmTeXPW+k8Sc=
+-github.com/cpuguy83/go-md2man/v2 v2.0.2 h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHHBfMQ6w=
+-github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
++github.com/cpuguy83/go-md2man/v2 v2.0.3 h1:qMCsGGgs+MAzDFyp9LpAe1Lqy/fY/qCovCm0qnXZOBM=
++github.com/cpuguy83/go-md2man/v2 v2.0.3/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
+ github.com/creack/pty v1.1.17/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
+ github.com/creack/pty v1.1.18 h1:n56/Zwd5o6whRC5PMGretI4IdRLlmBXYNjScPaBgsbY=
+ github.com/creack/pty v1.1.18/go.mod h1:MOBLtS5ELjhRRrroQr9kyvTxUAFNvYEK993ew/Vr4O4=
