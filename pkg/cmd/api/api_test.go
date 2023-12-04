@@ -52,6 +52,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -73,6 +74,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -94,6 +96,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -115,6 +118,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -136,6 +140,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -157,6 +162,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -183,6 +189,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -209,6 +216,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -235,6 +243,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -256,6 +265,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            time.Minute * 5,
 				Template:            "",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -277,6 +287,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "hello {{.name}}",
 				FilterOutput:        "",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -298,6 +309,7 @@ func Test_NewCmdApi(t *testing.T) {
 				CacheTTL:            0,
 				Template:            "",
 				FilterOutput:        ".name",
+				Verbose:             false,
 			},
 			wantsErr: false,
 		},
@@ -315,6 +327,28 @@ func Test_NewCmdApi(t *testing.T) {
 			name:     "--jq with --template",
 			cli:      "user --jq .foo -t '{{.foo}}'",
 			wantsErr: true,
+		},
+		{
+			name: "with verbose",
+			cli:  "user --verbose",
+			wants: ApiOptions{
+				Hostname:            "",
+				RequestMethod:       "GET",
+				RequestMethodPassed: false,
+				RequestPath:         "user",
+				RequestInputFile:    "",
+				RawFields:           []string(nil),
+				MagicFields:         []string(nil),
+				RequestHeaders:      []string(nil),
+				ShowResponseHeaders: false,
+				Paginate:            false,
+				Silent:              false,
+				CacheTTL:            0,
+				Template:            "",
+				FilterOutput:        "",
+				Verbose:             true,
+			},
+			wantsErr: false,
 		},
 	}
 	for _, tt := range tests {
@@ -352,6 +386,7 @@ func Test_NewCmdApi(t *testing.T) {
 			assert.Equal(t, tt.wants.CacheTTL, opts.CacheTTL)
 			assert.Equal(t, tt.wants.Template, opts.Template)
 			assert.Equal(t, tt.wants.FilterOutput, opts.FilterOutput)
+			assert.Equal(t, tt.wants.Verbose, opts.Verbose)
 		})
 	}
 }
@@ -661,6 +696,78 @@ func Test_apiRun_paginationREST(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.Equal(t, `{"page":1}{"page":2}{"page":3}`, stdout.String(), "stdout")
+	assert.Equal(t, "", stderr.String(), "stderr")
+
+	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=2", responses[1].Request.URL.String())
+	assert.Equal(t, "https://api.github.com/repositories/1227/issues?page=3", responses[2].Request.URL.String())
+}
+
+func Test_apiRun_arrayPaginationREST(t *testing.T) {
+	ios, _, stdout, stderr := iostreams.Test()
+	ios.SetStdoutTTY(false)
+
+	requestCount := 0
+	responses := []*http.Response{
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":1},{"item":2}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=2>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":3},{"item":4}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=3>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[{"item":5}]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Link":         []string{`<https://api.github.com/repositories/1227/issues?page=4>; rel="next", <https://api.github.com/repositories/1227/issues?page=4>; rel="last"`},
+			},
+		},
+		{
+			StatusCode: 200,
+			Body:       io.NopCloser(bytes.NewBufferString(`[]`)),
+			Header: http.Header{
+				"Content-Type": []string{"application/json"},
+			},
+		},
+	}
+
+	options := ApiOptions{
+		IO: ios,
+		HttpClient: func() (*http.Client, error) {
+			var tr roundTripper = func(req *http.Request) (*http.Response, error) {
+				resp := responses[requestCount]
+				resp.Request = req
+				requestCount++
+				return resp, nil
+			}
+			return &http.Client{Transport: tr}, nil
+		},
+		Config: func() (config.Config, error) {
+			return config.NewBlankConfig(), nil
+		},
+
+		RequestMethod:       "GET",
+		RequestMethodPassed: true,
+		RequestPath:         "issues",
+		Paginate:            true,
+		RawFields:           []string{"per_page=50", "page=1"},
+	}
+
+	err := apiRun(&options)
+	assert.NoError(t, err)
+
+	assert.Equal(t, `[{"item":1},{"item":2},{"item":3},{"item":4},{"item":5} ]`, stdout.String(), "stdout")
 	assert.Equal(t, "", stderr.String(), "stderr")
 
 	assert.Equal(t, "https://api.github.com/issues?page=1&per_page=50", responses[0].Request.URL.String())
@@ -1024,10 +1131,11 @@ func Test_fillPlaceholders(t *testing.T) {
 		opts  *ApiOptions
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    string
-		wantErr bool
+		name         string
+		args         args
+		repoOverride bool
+		want         string
+		wantErr      bool
 	}{
 		{
 			name: "no changes",
@@ -1164,9 +1272,26 @@ func Test_fillPlaceholders(t *testing.T) {
 			want:    "{}{ownership}/{repository}",
 			wantErr: false,
 		},
+		{
+			name:         "branch can't be filled when GH_REPO is set",
+			repoOverride: true,
+			args: args{
+				value: "repos/:owner/:repo/branches/:branch",
+				opts: &ApiOptions{
+					BaseRepo: func() (ghrepo.Interface, error) {
+						return ghrepo.New("hubot", "robot-uprising"), nil
+					},
+				},
+			},
+			want:    "repos/hubot/robot-uprising/branches/:branch",
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			if tt.repoOverride {
+				t.Setenv("GH_REPO", "hubot/robot-uprising")
+			}
 			got, err := fillPlaceholders(tt.args.value, tt.args.opts)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("fillPlaceholders() error = %v, wantErr %v", err, tt.wantErr)
@@ -1236,7 +1361,7 @@ func Test_processResponse_template(t *testing.T) {
 	tmpl := template.New(ios.Out, ios.TerminalWidth(), ios.ColorEnabled())
 	err := tmpl.Parse(opts.Template)
 	require.NoError(t, err)
-	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl)
+	_, err = processResponse(&resp, &opts, ios.Out, io.Discard, tmpl, true, true)
 	require.NoError(t, err)
 	err = tmpl.Flush()
 	require.NoError(t, err)
