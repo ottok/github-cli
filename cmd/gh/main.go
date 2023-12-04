@@ -34,10 +34,11 @@ var updaterEnabled = ""
 type exitCode int
 
 const (
-	exitOK     exitCode = 0
-	exitError  exitCode = 1
-	exitCancel exitCode = 2
-	exitAuth   exitCode = 4
+	exitOK      exitCode = 0
+	exitError   exitCode = 1
+	exitCancel  exitCode = 2
+	exitAuth    exitCode = 4
+	exitPending exitCode = 8
 )
 
 func main() {
@@ -109,10 +110,12 @@ func mainRun() exitCode {
 	if cmd, err := rootCmd.ExecuteContextC(ctx); err != nil {
 		var pagerPipeError *iostreams.ErrClosedPagerPipe
 		var noResultsError cmdutil.NoResultsError
-		var execError *exec.ExitError
+		var extError *root.ExternalCommandExitError
 		var authError *root.AuthError
 		if err == cmdutil.SilentError {
 			return exitError
+		} else if err == cmdutil.PendingError {
+			return exitPending
 		} else if cmdutil.IsUserCancellation(err) {
 			if errors.Is(err, terminal.InterruptErr) {
 				// ensure the next shell prompt will start on its own line
@@ -130,8 +133,9 @@ func mainRun() exitCode {
 			}
 			// no results is not a command failure
 			return exitOK
-		} else if errors.As(err, &execError) {
-			return exitCode(execError.ExitCode())
+		} else if errors.As(err, &extError) {
+			// pass on exit codes from extensions and shell aliases
+			return exitCode(extError.ExitCode())
 		}
 
 		printError(stderr, err, cmd, hasDebug)

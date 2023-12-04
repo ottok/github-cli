@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"testing"
 	"time"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/cli/cli/v2/pkg/iostreams"
 	"github.com/google/shlex"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewCmdView(t *testing.T) {
@@ -1241,6 +1243,42 @@ func TestViewRun(t *testing.T) {
 			},
 			wantOut: "\nX trunk CI · 123\nTriggered via push about 59 minutes ago\n\nX This run likely failed because of a workflow file issue.\n\nFor more information, see: https://github.com/runs/123\n",
 		},
+		{
+			name: "Fetches all of a run's jobs with --json flag",
+			opts: &ViewOptions{
+				RunID: "3",
+				Exporter: shared.MakeTestExporter(
+					[]string{"jobs"},
+					func(io *iostreams.IOStreams, data interface{}) error {
+						run, ok := data.(*shared.Run)
+						if !ok {
+							return fmt.Errorf("expected data type *shared.Run")
+						}
+						fmt.Fprintf(io.Out, "fetched %d jobs\n", len(run.Jobs))
+						return nil
+					},
+				),
+			},
+			httpStubs: func(reg *httpmock.Registry) {
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/runs/3"),
+					httpmock.JSONResponse(shared.SuccessfulRun))
+				reg.Register(
+					httpmock.REST("GET", "repos/OWNER/REPO/actions/workflows/123"),
+					httpmock.JSONResponse(shared.TestWorkflow))
+				reg.Register(
+					httpmock.QueryMatcher("GET", "runs/3/jobs", url.Values{"per_page": []string{"100"}}),
+					httpmock.WithHeader(
+						httpmock.StringResponse(`{"jobs":[{},{},{}]}`),
+						"Link",
+						`<https://api.github.com/runs/3/jobs?page=2>; rel="next", <https://api.github.com/runs/3/jobs?page=2>; rel="last"`),
+				)
+				reg.Register(
+					httpmock.REST("GET", "runs/3/jobs"),
+					httpmock.StringResponse(`{"jobs":[{},{}]}`))
+			},
+			wantOut: "fetched 5 jobs\n",
+		},
 	}
 
 	for _, tt := range tests {
@@ -1381,18 +1419,36 @@ func Test_attachRunLog(t *testing.T) {
 			},
 			wantMatch: false,
 		},
+		{
+			name: "job name with forward slash matches dir with slash removed",
+			job: shared.Job{
+				Name: "cool job / with slash",
+				Steps: []shared.Step{{
+					Name:   "fob the barz",
+					Number: 1,
+				}},
+			},
+			wantMatch: true,
+			// not the double space in the dir name, as the slash has been removed
+			wantFilename: "cool job  with slash/1_fob the barz.txt",
+		},
 	}
-	rlz, _ := zip.OpenReader("./fixtures/run_log.zip")
+
+	rlz, err := zip.OpenReader("./fixtures/run_log.zip")
+	require.NoError(t, err)
 	defer rlz.Close()
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			attachRunLog(rlz, []shared.Job{tt.job})
+
+			attachRunLog(&rlz.Reader, []shared.Job{tt.job})
+
 			for _, step := range tt.job.Steps {
 				log := step.Log
 				logPresent := log != nil
-				assert.Equal(t, tt.wantMatch, logPresent)
+				require.Equal(t, tt.wantMatch, logPresent)
 				if logPresent {
-					assert.Equal(t, tt.wantFilename, log.Name)
+					require.Equal(t, tt.wantFilename, log.Name)
 				}
 			}
 		})

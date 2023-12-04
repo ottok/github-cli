@@ -164,8 +164,8 @@ func NewCmdCreate(f *cmdutil.Factory, runF func(*CreateOptions) error) *cobra.Co
 			if cmd.Flags().Changed("enable-wiki") {
 				opts.DisableWiki = !enableWiki
 			}
-			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues || opts.DisableWiki) {
-				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, `--disable-issues`, or `--disable-wiki`")
+			if opts.Template != "" && (opts.Homepage != "" || opts.Team != "" || opts.DisableIssues) {
+				return cmdutil.FlagErrorf("the `--template` option is not supported with `--homepage`, `--team`, or `--disable-issues`")
 			}
 
 			if opts.Template == "" && opts.IncludeAllBranches {
@@ -396,7 +396,7 @@ func createFromScratch(opts *CreateOptions) error {
 
 		remoteURL := ghrepo.FormatRemoteURL(repo, protocol)
 
-		if opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
+		if !opts.AddReadme && opts.LicenseTemplate == "" && opts.GitIgnoreTemplate == "" && opts.Template == "" {
 			// cloning empty repository or template
 			if err := localInit(opts.GitClient, remoteURL, repo.RepoName()); err != nil {
 				return err
@@ -662,8 +662,8 @@ func localInit(gitClient *git.Client, remoteURL, path string) error {
 		return err
 	}
 
-	// Clone the client so we do not modify the original client's RepoDir.
-	gc := cloneGitClient(gitClient)
+	// Copy the client so we do not modify the original client's RepoDir.
+	gc := gitClient.Copy()
 	gc.RepoDir = path
 
 	gitRemoteAdd, err := gc.Command(ctx, "remote", "add", "origin", remoteURL)
@@ -793,15 +793,4 @@ func splitNameAndOwner(name string) (string, string, error) {
 		return "", "", fmt.Errorf("argument error: %w", err)
 	}
 	return repo.RepoName(), repo.RepoOwner(), nil
-}
-
-func cloneGitClient(c *git.Client) *git.Client {
-	return &git.Client{
-		GhPath:  c.GhPath,
-		RepoDir: c.RepoDir,
-		GitPath: c.GitPath,
-		Stderr:  c.Stderr,
-		Stdin:   c.Stdin,
-		Stdout:  c.Stdout,
-	}
 }

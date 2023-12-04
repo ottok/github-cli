@@ -2,20 +2,17 @@ package root
 
 import (
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
-	"sync"
 
 	"github.com/MakeNowJust/heredoc"
-	"github.com/cli/cli/v2/api"
-	codespacesAPI "github.com/cli/cli/v2/internal/codespaces/api"
 	actionsCmd "github.com/cli/cli/v2/pkg/cmd/actions"
 	aliasCmd "github.com/cli/cli/v2/pkg/cmd/alias"
 	"github.com/cli/cli/v2/pkg/cmd/alias/shared"
 	apiCmd "github.com/cli/cli/v2/pkg/cmd/api"
 	authCmd "github.com/cli/cli/v2/pkg/cmd/auth"
 	browseCmd "github.com/cli/cli/v2/pkg/cmd/browse"
+	cacheCmd "github.com/cli/cli/v2/pkg/cmd/cache"
 	codespaceCmd "github.com/cli/cli/v2/pkg/cmd/codespace"
 	completionCmd "github.com/cli/cli/v2/pkg/cmd/completion"
 	configCmd "github.com/cli/cli/v2/pkg/cmd/config"
@@ -27,9 +24,11 @@ import (
 	labelCmd "github.com/cli/cli/v2/pkg/cmd/label"
 	orgCmd "github.com/cli/cli/v2/pkg/cmd/org"
 	prCmd "github.com/cli/cli/v2/pkg/cmd/pr"
+	projectCmd "github.com/cli/cli/v2/pkg/cmd/project"
 	releaseCmd "github.com/cli/cli/v2/pkg/cmd/release"
 	repoCmd "github.com/cli/cli/v2/pkg/cmd/repo"
 	creditsCmd "github.com/cli/cli/v2/pkg/cmd/repo/credits"
+	rulesetCmd "github.com/cli/cli/v2/pkg/cmd/ruleset"
 	runCmd "github.com/cli/cli/v2/pkg/cmd/run"
 	searchCmd "github.com/cli/cli/v2/pkg/cmd/search"
 	secretCmd "github.com/cli/cli/v2/pkg/cmd/secret"
@@ -131,13 +130,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(variableCmd.NewCmdVariable(f))
 	cmd.AddCommand(sshKeyCmd.NewCmdSSHKey(f))
 	cmd.AddCommand(statusCmd.NewCmdStatus(f, nil))
-	cmd.AddCommand(newCodespaceCmd(f))
-
-	// the `api` command should not inherit any extra HTTP headers
-	bareHTTPCmdFactory := *f
-	bareHTTPCmdFactory.HttpClient = bareHTTPClient(f, version)
-
-	cmd.AddCommand(apiCmd.NewCmdApi(&bareHTTPCmdFactory, nil))
+	cmd.AddCommand(codespaceCmd.NewCmdCodespace(f))
+	cmd.AddCommand(projectCmd.NewCmdProject(f))
 
 	// below here at the commands that require the "intelligent" BaseRepo resolver
 	repoResolvingCmdFactory := *f
@@ -149,9 +143,12 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	cmd.AddCommand(issueCmd.NewCmdIssue(&repoResolvingCmdFactory))
 	cmd.AddCommand(releaseCmd.NewCmdRelease(&repoResolvingCmdFactory))
 	cmd.AddCommand(repoCmd.NewCmdRepo(&repoResolvingCmdFactory))
+	cmd.AddCommand(rulesetCmd.NewCmdRuleset(&repoResolvingCmdFactory))
 	cmd.AddCommand(runCmd.NewCmdRun(&repoResolvingCmdFactory))
 	cmd.AddCommand(workflowCmd.NewCmdWorkflow(&repoResolvingCmdFactory))
 	cmd.AddCommand(labelCmd.NewCmdLabel(&repoResolvingCmdFactory))
+	cmd.AddCommand(cacheCmd.NewCmdCache(&repoResolvingCmdFactory))
+	cmd.AddCommand(apiCmd.NewCmdApi(&repoResolvingCmdFactory, nil))
 
 	// Help topics
 	var referenceCmd *cobra.Command
@@ -163,6 +160,13 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 		if ht.name == "reference" {
 			referenceCmd = helpTopicCmd
 		}
+	}
+
+	// Extensions
+	em := f.ExtensionManager
+	for _, e := range em.List() {
+		extensionCmd := NewCmdExtension(io, em, e)
+		cmd.AddCommand(extensionCmd)
 	}
 
 	// Aliases
@@ -184,7 +188,6 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 			if strings.HasPrefix(aliasValue, "!") {
 				shellAliasCmd := NewCmdShellAlias(io, parentArgs[0], aliasValue)
 				parentCmd.AddCommand(shellAliasCmd)
-				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tShell alias", aliasName))
 			} else {
 				aliasCmd := NewCmdAlias(io, parentArgs[0], aliasValue)
 				split, _ := shlex.Split(aliasValue)
@@ -196,18 +199,8 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 					rootHelpFunc(f, child, args)
 				})
 				parentCmd.AddCommand(aliasCmd)
-				parentCmd.ValidArgs = append(parentCmd.ValidArgs, fmt.Sprintf("%s\tAlias for %s", aliasName, aliasValue))
 			}
 		}
-	}
-
-	// Extensions
-	em := f.ExtensionManager
-	for _, e := range em.List() {
-		extension := e
-		extensionCmd := NewCmdExtension(io, em, e)
-		cmd.AddCommand(extensionCmd)
-		cmd.ValidArgs = append(cmd.ValidArgs, fmt.Sprintf("%s\t%s", extension.Name(), extensionCmd.Short))
 	}
 
 	cmdutil.DisableAuthCheck(cmd)
@@ -220,69 +213,4 @@ func NewCmdRoot(f *cmdutil.Factory, version, buildDate string) (*cobra.Command, 
 	referenceCmd.Long = stringifyReference(cmd)
 	referenceCmd.SetHelpFunc(longPager(f.IOStreams))
 	return cmd, nil
-}
-
-func bareHTTPClient(f *cmdutil.Factory, version string) func() (*http.Client, error) {
-	return func() (*http.Client, error) {
-		cfg, err := f.Config()
-		if err != nil {
-			return nil, err
-		}
-		opts := api.HTTPClientOptions{
-			AppVersion:        version,
-			Config:            cfg.Authentication(),
-			Log:               f.IOStreams.ErrOut,
-			LogColorize:       f.IOStreams.ColorEnabled(),
-			SkipAcceptHeaders: true,
-		}
-		return api.NewHTTPClient(opts)
-	}
-}
-
-func newCodespaceCmd(f *cmdutil.Factory) *cobra.Command {
-	serverURL := os.Getenv("GITHUB_SERVER_URL")
-	apiURL := os.Getenv("GITHUB_API_URL")
-	vscsURL := os.Getenv("INTERNAL_VSCS_TARGET_URL")
-	app := codespaceCmd.NewApp(
-		f.IOStreams,
-		f,
-		codespacesAPI.New(
-			serverURL,
-			apiURL,
-			vscsURL,
-			&lazyLoadedHTTPClient{factory: f},
-		),
-		f.Browser,
-		f.Remotes,
-	)
-	cmd := codespaceCmd.NewRootCmd(app)
-	cmd.Use = "codespace"
-	cmd.Aliases = []string{"cs"}
-	cmd.GroupID = "core"
-	return cmd
-}
-
-type lazyLoadedHTTPClient struct {
-	factory *cmdutil.Factory
-
-	httpClientMu sync.RWMutex // guards httpClient
-	httpClient   *http.Client
-}
-
-func (l *lazyLoadedHTTPClient) Do(req *http.Request) (*http.Response, error) {
-	l.httpClientMu.RLock()
-	httpClient := l.httpClient
-	l.httpClientMu.RUnlock()
-
-	if httpClient == nil {
-		var err error
-		l.httpClientMu.Lock()
-		l.httpClient, err = l.factory.HttpClient()
-		l.httpClientMu.Unlock()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return l.httpClient.Do(req)
 }
