@@ -1,3 +1,16 @@
+gh (2.35.0-1) unstable; urgency=medium
+
+  * New upstream version 2.35.0
+  * Bump versioned dependencies as per go.mod
+  * Remove temporary local copy of github.com/mislav/httpretty.
+    The proposed changes in the github.com/mislav/httpretty has been merged
+    upstream; see https://github.com/cli/cli/pull/7654. This reverts
+    "Replace github.com/henvic/httpretty with github.com/mislav/httpretty"
+  * Bump local copy of google.golang.org/grpc from v1.49.0 to v1.53.0
+  * Refresh 0002-go-md2man-fix.patch
+
+ -- Anthony Fok <foka@debian.org>  Mon, 04 Dec 2023 05:09:29 -0700
+
 gh (2.30.0-2) unstable; urgency=medium
 
   * Team Upload.
