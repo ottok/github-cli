@@ -25,7 +25,7 @@ import (
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/internal"
-	xdsinternal "google.golang.org/grpc/internal/xds"
+	"google.golang.org/grpc/internal/testutils/xds/bootstrap"
 	"google.golang.org/grpc/resolver"
 )
 
@@ -41,7 +41,7 @@ import (
 // - bootstrap contents to be used by the client
 // - xDS resolver builder to be used by the client
 // - a cleanup function to be invoked at the end of the test
-func SetupManagementServer(t *testing.T, opts *ManagementServerOptions) (*ManagementServer, string, []byte, resolver.Builder, func()) {
+func SetupManagementServer(t *testing.T, opts ManagementServerOptions) (*ManagementServer, string, []byte, resolver.Builder, func()) {
 	t.Helper()
 
 	// Spin up an xDS management server on a local port.
@@ -78,8 +78,8 @@ func SetupManagementServer(t *testing.T, opts *ManagementServerOptions) (*Manage
 
 	// Create a bootstrap file in a temporary directory.
 	nodeID := uuid.New().String()
-	bootstrapContents, err := xdsinternal.BootstrapContents(xdsinternal.BootstrapOptions{
-		Version:                            xdsinternal.TransportV3,
+	bootstrapContents, err := bootstrap.Contents(bootstrap.Options{
+		Version:                            bootstrap.TransportV3,
 		NodeID:                             nodeID,
 		ServerURI:                          server.Address,
 		CertificateProviders:               cpc,
@@ -89,12 +89,15 @@ func SetupManagementServer(t *testing.T, opts *ManagementServerOptions) (*Manage
 		server.Stop()
 		t.Fatalf("Failed to create bootstrap file: %v", err)
 	}
-	resolverBuilder := internal.NewXDSResolverWithConfigForTesting.(func([]byte) (resolver.Builder, error))
-	resolver, err := resolverBuilder(bootstrapContents)
-	if err != nil {
-		server.Stop()
-		t.Fatalf("Failed to create xDS resolver for testing: %v", err)
+
+	var rb resolver.Builder
+	if newResolver := internal.NewXDSResolverWithConfigForTesting; newResolver != nil {
+		rb, err = newResolver.(func([]byte) (resolver.Builder, error))(bootstrapContents)
+		if err != nil {
+			server.Stop()
+			t.Fatalf("Failed to create xDS resolver for testing: %v", err)
+		}
 	}
 
-	return server, nodeID, bootstrapContents, resolver, func() { server.Stop() }
+	return server, nodeID, bootstrapContents, rb, func() { server.Stop() }
 }

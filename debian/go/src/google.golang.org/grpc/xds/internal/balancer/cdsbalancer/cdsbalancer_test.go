@@ -29,7 +29,6 @@ import (
 	"google.golang.org/grpc/balancer"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/internal"
-	"google.golang.org/grpc/internal/envconfig"
 	"google.golang.org/grpc/internal/grpctest"
 	internalserviceconfig "google.golang.org/grpc/internal/serviceconfig"
 	"google.golang.org/grpc/internal/testutils"
@@ -256,7 +255,6 @@ func setup(t *testing.T) (*fakeclient.Client, *cdsBalancer, *testEDSBalancer, *t
 
 	return xdsC, cdsB.(*cdsBalancer), edsB, tcc, func() {
 		newChildBalancer = oldEDSBalancerBuilder
-		xdsC.Close()
 	}
 }
 
@@ -287,7 +285,6 @@ func setupWithWatch(t *testing.T) (*fakeclient.Client, *cdsBalancer, *testEDSBal
 // provided xdsClient is invoked appropriately.
 func (s) TestUpdateClientConnState(t *testing.T) {
 	xdsC := fakeclient.NewClient()
-	defer xdsC.Close()
 
 	tests := []struct {
 		name        string
@@ -366,14 +363,11 @@ func (s) TestUpdateClientConnStateWithSameState(t *testing.T) {
 // different updates and verifies that the expect ClientConnState is propagated
 // to the edsBalancer.
 func (s) TestHandleClusterUpdate(t *testing.T) {
-	oldOutlierDetection := envconfig.XDSOutlierDetection
-	envconfig.XDSOutlierDetection = true
 	xdsC, cdsB, edsB, _, cancel := setupWithWatch(t)
 	xdsC.SetBootstrapConfig(&bootstrap.Config{
 		XDSServer: defaultTestAuthorityServerConfig,
 	})
 	defer func() {
-		envconfig.XDSOutlierDetection = oldOutlierDetection
 		cancel()
 		cdsB.Close()
 	}()
@@ -506,7 +500,7 @@ func (s) TestHandleClusterUpdateError(t *testing.T) {
 	// returned to the CDS balancer, because we have overridden the
 	// newChildBalancer function as part of test setup.
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: serviceName}
-	wantCCS := edsCCS(serviceName, nil, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(serviceName, nil, false, nil, noopODLBCfg)
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
 		t.Fatal(err)
 	}
@@ -591,7 +585,7 @@ func (s) TestResolverError(t *testing.T) {
 	// returned to the CDS balancer, because we have overridden the
 	// newChildBalancer function as part of test setup.
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: serviceName}
-	wantCCS := edsCCS(serviceName, nil, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(serviceName, nil, false, nil, noopODLBCfg)
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
 		t.Fatal(err)
 	}
@@ -640,7 +634,7 @@ func (s) TestUpdateSubConnState(t *testing.T) {
 	// returned to the CDS balancer, because we have overridden the
 	// newChildBalancer function as part of test setup.
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: serviceName}
-	wantCCS := edsCCS(serviceName, nil, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(serviceName, nil, false, nil, noopODLBCfg)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer ctxCancel()
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
@@ -675,7 +669,7 @@ func (s) TestCircuitBreaking(t *testing.T) {
 	// the service's counter with the new max requests.
 	var maxRequests uint32 = 1
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: clusterName, MaxRequests: &maxRequests}
-	wantCCS := edsCCS(clusterName, &maxRequests, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(clusterName, &maxRequests, false, nil, noopODLBCfg)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer ctxCancel()
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
@@ -694,7 +688,7 @@ func (s) TestCircuitBreaking(t *testing.T) {
 	counter.EndRequest()
 }
 
-// TestClose verifies the Close() method in the the CDS balancer.
+// TestClose verifies the Close() method in the CDS balancer.
 func (s) TestClose(t *testing.T) {
 	// This creates a CDS balancer, pushes a ClientConnState update with a fake
 	// xdsClient, and makes sure that the CDS balancer registers a watch on the
@@ -708,7 +702,7 @@ func (s) TestClose(t *testing.T) {
 	// returned to the CDS balancer, because we have overridden the
 	// newChildBalancer function as part of test setup.
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: serviceName}
-	wantCCS := edsCCS(serviceName, nil, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(serviceName, nil, false, nil, noopODLBCfg)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer ctxCancel()
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
@@ -779,7 +773,7 @@ func (s) TestExitIdle(t *testing.T) {
 	// returned to the CDS balancer, because we have overridden the
 	// newChildBalancer function as part of test setup.
 	cdsUpdate := xdsresource.ClusterUpdate{ClusterName: serviceName}
-	wantCCS := edsCCS(serviceName, nil, false, nil, outlierdetection.LBConfig{})
+	wantCCS := edsCCS(serviceName, nil, false, nil, noopODLBCfg)
 	ctx, ctxCancel := context.WithTimeout(context.Background(), defaultTestTimeout)
 	defer ctxCancel()
 	if err := invokeWatchCbAndWait(ctx, xdsC, cdsWatchInfo{cdsUpdate, nil}, wantCCS, edsB); err != nil {
