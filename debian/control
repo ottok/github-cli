@@ -46,8 +46,11 @@ Build-Depends: debhelper-compat (= 13),
                golang-golang-x-sync-dev (>= 0.1.0),
                golang-golang-x-term-dev (>= 0.13.0),
                golang-golang-x-text-dev (>= 0.13.0),
-               golang-google-genproto-dev,
+### begin google.golang.org/grpc (see debian/go/src) ###########
 #              golang-google-grpc-dev (>= 1.56.3),
+               golang-github-golang-protobuf-1-5-dev (>= 1.5.3),
+               golang-google-genproto-dev,
+### end google.golang.org/grpc #################################
                golang-google-protobuf-dev (>= 1.30.0),
                golang-gopkg-h2non-gock.v1-dev (>= 1.1.2),
                golang-gopkg-yaml.v3-dev (>= 3.0.1),
