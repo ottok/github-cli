@@ -23,6 +23,7 @@ import (
 	"testing"
 	"time"
 
+	v2xdspb "github.com/envoyproxy/go-control-plane/envoy/api/v2"
 	"github.com/golang/protobuf/proto"
 	"github.com/google/go-cmp/cmp"
 	"google.golang.org/grpc/internal/envconfig"
@@ -33,13 +34,9 @@ import (
 	"google.golang.org/grpc/xds/internal/xdsclient/xdsresource/version"
 	"google.golang.org/protobuf/types/known/durationpb"
 
-	v1udpatypepb "github.com/cncf/udpa/go/udpa/type/v1"
-	v3cncftypepb "github.com/cncf/xds/go/xds/type/v3"
-	v2xdspb "github.com/envoyproxy/go-control-plane/envoy/api/v2"
-	v2corepb "github.com/envoyproxy/go-control-plane/envoy/api/v2/core"
+	v1udpaudpatypepb "github.com/cncf/udpa/go/udpa/type/v1"
+	v3xdsxdstypepb "github.com/cncf/xds/go/xds/type/v3"
 	v3corepb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
-	v2httppb "github.com/envoyproxy/go-control-plane/envoy/config/filter/network/http_connection_manager/v2"
-	v2listenerpb "github.com/envoyproxy/go-control-plane/envoy/config/listener/v2"
 	v3listenerpb "github.com/envoyproxy/go-control-plane/envoy/config/listener/v3"
 	rpb "github.com/envoyproxy/go-control-plane/envoy/config/rbac/v3"
 	v3routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
@@ -58,30 +55,12 @@ import (
 
 func (s) TestUnmarshalListener_ClientSide(t *testing.T) {
 	const (
-		v2LDSTarget       = "lds.target.good:2222"
 		v3LDSTarget       = "lds.target.good:3333"
-		v2RouteConfigName = "v2RouteConfig"
 		v3RouteConfigName = "v3RouteConfig"
 		routeName         = "routeName"
-		testVersion       = "test-version-lds-client"
 	)
 
 	var (
-		v2Lis = testutils.MarshalAny(&v2xdspb.Listener{
-			Name: v2LDSTarget,
-			ApiListener: &v2listenerpb.ApiListener{
-				ApiListener: testutils.MarshalAny(&v2httppb.HttpConnectionManager{
-					RouteSpecifier: &v2httppb.HttpConnectionManager_Rds{
-						Rds: &v2httppb.Rds{
-							ConfigSource: &v2corepb.ConfigSource{
-								ConfigSourceSpecifier: &v2corepb.ConfigSource_Ads{Ads: &v2corepb.AggregatedConfigSource{}},
-							},
-							RouteConfigName: v2RouteConfigName,
-						},
-					},
-				}),
-			},
-		})
 		customFilter = &v3httppb.HttpFilter{
 			Name:       "customFilter",
 			ConfigType: &v3httppb.HttpFilter_TypedConfig{TypedConfig: customFilterConfig},
@@ -522,24 +501,6 @@ func (s) TestUnmarshalListener_ClientSide(t *testing.T) {
 			},
 		},
 		{
-			name:     "v2 listener resource",
-			resource: v2Lis,
-			wantName: v2LDSTarget,
-			wantUpdate: ListenerUpdate{
-				RouteConfigName: v2RouteConfigName,
-				Raw:             v2Lis,
-			},
-		},
-		{
-			name:     "v2 listener resource wrapped",
-			resource: testutils.MarshalAny(&v2xdspb.Resource{Resource: v2Lis}),
-			wantName: v2LDSTarget,
-			wantUpdate: ListenerUpdate{
-				RouteConfigName: v2RouteConfigName,
-				Raw:             v2Lis,
-			},
-		},
-		{
 			name:     "v3 listener resource",
 			resource: v3LisWithFilters(),
 			wantName: v3LDSTarget,
@@ -616,7 +577,7 @@ func (s) TestUnmarshalListener_ClientSide(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			name, update, err := unmarshalListenerResource(test.resource, nil)
+			name, update, err := unmarshalListenerResource(test.resource)
 			if (err != nil) != test.wantErr {
 				t.Errorf("unmarshalListenerResource(%s), got err: %v, wantErr: %v", pretty.ToJSON(test.resource), err, test.wantErr)
 			}
@@ -1744,7 +1705,7 @@ func (s) TestUnmarshalListener_ServerSide(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			name, update, err := unmarshalListenerResource(test.resource, nil)
+			name, update, err := unmarshalListenerResource(test.resource)
 			if err != nil && !strings.Contains(err.Error(), test.wantErr) {
 				t.Errorf("unmarshalListenerResource(%s) = %v wantErr: %q", pretty.ToJSON(test.resource), err, test.wantErr)
 			}
@@ -1869,7 +1830,7 @@ var clientOnlyCustomFilterConfig = &anypb.Any{
 }
 
 // This custom filter uses the old TypedStruct message from the cncf/udpa repo.
-var customFilterOldTypedStructConfig = &v1udpatypepb.TypedStruct{
+var customFilterOldTypedStructConfig = &v1udpaudpatypepb.TypedStruct{
 	TypeUrl: "custom.filter",
 	Value: &spb.Struct{
 		Fields: map[string]*spb.Value{
@@ -1880,7 +1841,7 @@ var customFilterOldTypedStructConfig = &v1udpatypepb.TypedStruct{
 var wrappedCustomFilterOldTypedStructConfig *anypb.Any
 
 // This custom filter uses the new TypedStruct message from the cncf/xds repo.
-var customFilterNewTypedStructConfig = &v3cncftypepb.TypedStruct{
+var customFilterNewTypedStructConfig = &v3xdsxdstypepb.TypedStruct{
 	TypeUrl: "custom.filter",
 	Value: &spb.Struct{
 		Fields: map[string]*spb.Value{

@@ -25,7 +25,7 @@ Files: debian/go/src/google.golang.org/grpc/*
 Copyright: 2018 The Go Authors
 License: BSD-3-Clause
 Comment:
- golang-google-protobuf-dev is at 1.27.1 and has not been upgraded to 1.49.0
+ golang-google-protobuf-dev is at v1.31.0 and has not been upgraded to v1.56.3
 
 License: BSD-3-Clause
  Redistribution and use in source and binary forms, with or without

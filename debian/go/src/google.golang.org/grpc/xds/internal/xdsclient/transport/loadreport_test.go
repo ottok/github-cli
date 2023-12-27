@@ -25,12 +25,9 @@ import (
 	v3corepb "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/xds/internal/testutils/fakeserver"
-	"google.golang.org/grpc/xds/internal/xdsclient/bootstrap"
+	"google.golang.org/grpc/internal/testutils/xds/fakeserver"
+	"google.golang.org/grpc/xds/internal/testutils"
 	"google.golang.org/grpc/xds/internal/xdsclient/transport"
-	"google.golang.org/grpc/xds/internal/xdsclient/xdsresource/version"
 	"google.golang.org/protobuf/testing/protocmp"
 	"google.golang.org/protobuf/types/known/durationpb"
 
@@ -44,22 +41,15 @@ func (s) TestReportLoad(t *testing.T) {
 	defer cleanup()
 	t.Logf("Started xDS management server on %s", mgmtServer.Address)
 
-	// Construct the server config to represent the management server.
-	nodeProto := &v3corepb.Node{Id: uuid.New().String()}
-	serverCfg := bootstrap.ServerConfig{
-		ServerURI:    mgmtServer.Address,
-		Creds:        grpc.WithTransportCredentials(insecure.NewCredentials()),
-		CredsType:    "insecure",
-		TransportAPI: version.TransportV3,
-		NodeProto:    nodeProto,
-	}
-
 	// Create a transport to the fake management server.
+	nodeProto := &v3corepb.Node{Id: uuid.New().String()}
 	tr, err := transport.New(transport.Options{
-		ServerCfg:          serverCfg,
-		UpdateHandler:      func(transport.ResourceUpdate) error { return nil }, // No ADS validation.
-		StreamErrorHandler: func(error) {},                                      // No ADS stream error handling.
-		Backoff:            func(int) time.Duration { return time.Duration(0) }, // No backoff.
+		ServerCfg:      *testutils.ServerConfigForAddress(t, mgmtServer.Address),
+		NodeProto:      nodeProto,
+		OnRecvHandler:  func(transport.ResourceUpdate) error { return nil }, // No ADS validation.
+		OnErrorHandler: func(error) {},                                      // No ADS stream error handling.
+		OnSendHandler:  func(*transport.ResourceSendInfo) {},                // No ADS stream update handling.
+		Backoff:        func(int) time.Duration { return time.Duration(0) }, // No backoff.
 	})
 	if err != nil {
 		t.Fatalf("Failed to create xDS transport: %v", err)
