@@ -19,6 +19,15 @@ const (
 	DEVCONTAINER_PROMPT_DEFAULT = "Default Codespaces configuration"
 )
 
+const (
+	permissionsPollingInterval = 5 * time.Second
+	permissionsPollingTimeout  = 1 * time.Minute
+)
+
+const (
+	displayNameMaxLength = 48 // 48 is the max length of the display name in the API
+)
+
 var (
 	DEFAULT_DEVCONTAINER_DEFINITIONS = []string{".devcontainer.json", ".devcontainer/devcontainer.json"}
 )
@@ -105,7 +114,7 @@ func newCreateCmd(app *App) *cobra.Command {
 	createCmd.Flags().DurationVar(&opts.idleTimeout, "idle-timeout", 0, "allowed inactivity before codespace is stopped, e.g. \"10m\", \"1h\"")
 	createCmd.Flags().Var(&opts.retentionPeriod, "retention-period", "allowed time after shutting down before the codespace is automatically deleted (maximum 30 days), e.g. \"1h\", \"72h\"")
 	createCmd.Flags().StringVar(&opts.devContainerPath, "devcontainer-path", "", "path to the devcontainer.json file to use when creating codespace")
-	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", "display name for the codespace")
+	createCmd.Flags().StringVarP(&opts.displayName, "display-name", "d", "", fmt.Sprintf("display name for the codespace (%d characters or less)", displayNameMaxLength))
 
 	return createCmd
 }
@@ -277,6 +286,10 @@ func (a *App) Create(ctx context.Context, opts createOptions) error {
 		}
 	}
 
+	if len(opts.displayName) > displayNameMaxLength {
+		return fmt.Errorf("error creating codespace: display name should contain a maximum of %d characters", displayNameMaxLength)
+	}
+
 	createParams := &api.CreateCodespaceParams{
 		RepositoryID:           repository.ID,
 		Branch:                 branch,
@@ -372,13 +385,14 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 
 	// if the user chose to continue in the browser, open the URL
 	if answers.Accept == choices[0] {
-		fmt.Fprintln(a.io.ErrOut, "Please re-run the create request after accepting permissions in the browser.")
 		if err := a.browser.Browse(allowPermissionsURL); err != nil {
 			return nil, fmt.Errorf("error opening browser: %w", err)
 		}
-		// browser opened successfully but we do not know if they accepted the permissions
-		// so we must exit and wait for the user to attempt the create again
-		return nil, cmdutil.SilentError
+
+		// Poll until the user has accepted the permissions or timeout
+		if err := a.pollForPermissions(ctx, createParams); err != nil {
+			return nil, fmt.Errorf("error polling for permissions: %w", err)
+		}
 	}
 
 	// if the user chose to create the codespace without the permissions,
@@ -396,6 +410,39 @@ func (a *App) handleAdditionalPermissions(ctx context.Context, createParams *api
 	}
 
 	return codespace, nil
+}
+
+func (a *App) pollForPermissions(ctx context.Context, createParams *api.CreateCodespaceParams) error {
+	return a.RunWithProgress("Waiting for permissions to be accepted in the browser", func() (err error) {
+		ctx, cancel := context.WithTimeout(ctx, permissionsPollingTimeout)
+		defer cancel()
+
+		done := make(chan error, 1)
+		go func() {
+			for {
+				accepted, err := a.apiClient.GetCodespacesPermissionsCheck(ctx, createParams.RepositoryID, createParams.Branch, createParams.DevContainerPath)
+				if err != nil {
+					done <- err
+					return
+				}
+
+				if accepted {
+					done <- nil
+					return
+				}
+
+				// Wait before polling again
+				time.Sleep(permissionsPollingInterval)
+			}
+		}()
+
+		select {
+		case err := <-done:
+			return err
+		case <-ctx.Done():
+			return fmt.Errorf("timed out waiting for permissions to be accepted in the browser")
+		}
+	})
 }
 
 // showStatus polls the codespace for a list of post create states and their status. It will keep polling
