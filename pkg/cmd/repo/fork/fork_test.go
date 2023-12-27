@@ -211,7 +211,7 @@ func TestRepoFork(t *testing.T) {
 		httpStubs   func(*httpmock.Registry)
 		execStubs   func(*run.CommandStubber)
 		promptStubs func(*prompter.MockPrompter)
-		cfgStubs    func(*config.ConfigMock)
+		cfgStubs    func(*testing.T, config.Config)
 		remotes     []*context.Remote
 		wantOut     string
 		wantErrOut  string
@@ -254,7 +254,7 @@ func TestRepoFork(t *testing.T) {
 					Repo: ghrepo.New("OWNER", "REPO"),
 				},
 			},
-			cfgStubs: func(c *config.ConfigMock) {
+			cfgStubs: func(_ *testing.T, c config.Config) {
 				c.Set("", "git_protocol", "")
 			},
 			httpStubs: forkPost,
@@ -442,8 +442,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone --depth 1 https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "repo arg fork to org",
@@ -473,8 +474,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/gamehendge/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork gamehendge/REPO\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "repo arg url arg",
@@ -488,8 +490,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "repo arg interactive no clone",
@@ -523,8 +526,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n",
+			wantErrOut: "✓ Created fork someone/REPO\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "repo arg interactive already forked",
@@ -546,8 +550,9 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
-			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\n",
+			wantErrOut: "! someone/REPO already exists\n✓ Cloned fork\n! Repository OWNER/REPO set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n",
 		},
 		{
 			name: "repo arg nontty no flags",
@@ -581,6 +586,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 			wantErrOut: "someone/REPO already exists\n",
 		},
@@ -595,6 +601,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 		},
 		{
@@ -684,6 +691,7 @@ func TestRepoFork(t *testing.T) {
 				cs.Register(`git clone https://github.com/someone/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO remote add upstream https://github\.com/OWNER/REPO\.git`, 0, "")
 				cs.Register(`git -C REPO fetch upstream`, 0, "")
+				cs.Register(`git -C REPO config --add remote.upstream.gh-resolved base`, 0, "")
 			},
 		},
 		{
@@ -723,9 +731,9 @@ func TestRepoFork(t *testing.T) {
 				return &http.Client{Transport: reg}, nil
 			}
 
-			cfg := config.NewBlankConfig()
+			cfg, _ := config.NewIsolatedTestConfig(t)
 			if tt.cfgStubs != nil {
-				tt.cfgStubs(cfg)
+				tt.cfgStubs(t, cfg)
 			}
 			tt.opts.Config = func() (config.Config, error) {
 				return cfg, nil

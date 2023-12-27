@@ -44,15 +44,17 @@ func NewCmdClone(f *cmdutil.Factory, runF func(*CloneOptions) error) *cobra.Comm
 		Short: "Clone a repository locally",
 		Long: heredoc.Docf(`
 			Clone a GitHub repository locally. Pass additional %[1]sgit clone%[1]s flags by listing
-			them after "--".
+			them after %[1]s--%[1]s.
 
-			If the "OWNER/" portion of the "OWNER/REPO" repository argument is omitted, it
+			If the %[1]sOWNER/%[1]s portion of the %[1]sOWNER/REPO%[1]s repository argument is omitted, it
 			defaults to the name of the authenticating user.
 
 			If the repository is a fork, its parent repository will be added as an additional
-			git remote called "upstream". The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
-			The %[1]s--upstream-remote-name%[1]s option supports an "@owner" value which will name
+			git remote called %[1]supstream%[1]s. The remote name can be configured using %[1]s--upstream-remote-name%[1]s.
+			The %[1]s--upstream-remote-name%[1]s option supports an %[1]s@owner%[1]s value which will name
 			the remote after the owner of the parent repository.
+
+			If the repository is a fork, its parent repository will be set as the default remote repository.
 		`, "`"),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Repository = args[0]
@@ -127,10 +129,7 @@ func cloneRun(opts *CloneOptions) error {
 			return err
 		}
 
-		protocol, err = cfg.GetOrDefault(repo.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
+		protocol = cfg.GitProtocol(repo.RepoHost())
 	}
 
 	wantsWiki := strings.HasSuffix(repo.RepoName(), ".wiki")
@@ -162,12 +161,9 @@ func cloneRun(opts *CloneOptions) error {
 		return err
 	}
 
-	// If the repo is a fork, add the parent as an upstream
+	// If the repo is a fork, add the parent as an upstream remote and set the parent as the default repo.
 	if canonicalRepo.Parent != nil {
-		protocol, err := cfg.GetOrDefault(canonicalRepo.Parent.RepoHost(), "git_protocol")
-		if err != nil {
-			return err
-		}
+		protocol := cfg.GitProtocol(canonicalRepo.Parent.RepoHost())
 		upstreamURL := ghrepo.FormatRemoteURL(canonicalRepo.Parent, protocol)
 
 		upstreamName := opts.UpstreamName
@@ -178,8 +174,7 @@ func cloneRun(opts *CloneOptions) error {
 		gc := gitClient.Copy()
 		gc.RepoDir = cloneDir
 
-		_, err = gc.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name})
-		if err != nil {
+		if _, err := gc.AddRemote(ctx, upstreamName, upstreamURL, []string{canonicalRepo.Parent.DefaultBranchRef.Name}); err != nil {
 			return err
 		}
 
@@ -189,6 +184,16 @@ func cloneRun(opts *CloneOptions) error {
 
 		if err := gc.SetRemoteBranches(ctx, upstreamName, `*`); err != nil {
 			return err
+		}
+
+		if err = gc.SetRemoteResolution(ctx, upstreamName, "base"); err != nil {
+			return err
+		}
+
+		connectedToTerminal := opts.IO.IsStdoutTTY()
+		if connectedToTerminal {
+			cs := opts.IO.ColorScheme()
+			fmt.Fprintf(opts.IO.ErrOut, "%s Repository %s set as the default repository. To learn more about the default repository, run: gh repo set-default --help\n", cs.WarningIcon(), cs.Bold(ghrepo.FullName(canonicalRepo.Parent)))
 		}
 	}
 	return nil

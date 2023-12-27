@@ -41,9 +41,9 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Short: "List variables",
 		Long: heredoc.Doc(`
 			List variables on one of the following levels:
-			- repository (default): available to Actions runs or Dependabot in a repository
-			- environment: available to Actions runs for a deployment environment in a repository
-			- organization: available to Actions runs or Dependabot within an organization
+			- repository (default): available to GitHub Actions runs or Dependabot in a repository
+			- environment: available to GitHub Actions runs for a deployment environment in a repository
+			- organization: available to GitHub Actions runs or Dependabot within an organization
 		`),
 		Aliases: []string{"ls"},
 		Args:    cobra.NoArgs,
@@ -124,12 +124,14 @@ func listRun(opts *ListOptions) error {
 		fmt.Fprintf(opts.IO.ErrOut, "failed to start pager: %v\n", err)
 	}
 
-	table := tableprinter.New(opts.IO)
+	var headers []string
 	if variableEntity == shared.Organization {
-		table.HeaderRow("Name", "Value", "Updated", "Visibility")
+		headers = []string{"Name", "Value", "Updated", "Visibility"}
 	} else {
-		table.HeaderRow("Name", "Value", "Updated")
+		headers = []string{"Name", "Value", "Updated"}
 	}
+
+	table := tableprinter.New(opts.IO, tableprinter.WithHeader(headers...))
 	for _, variable := range variables {
 		table.AddField(variable.Name)
 		table.AddField(variable.Value)

@@ -221,7 +221,7 @@ func runView(opts *ViewOptions) error {
 
 	if shouldFetchJobs(opts) {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return err
@@ -259,7 +259,7 @@ func runView(opts *ViewOptions) error {
 
 	if selectedJob == nil && len(jobs) == 0 {
 		opts.IO.StartProgressIndicator()
-		jobs, err = shared.GetJobs(client, repo, run)
+		jobs, err = shared.GetJobs(client, repo, run, attempt)
 		opts.IO.StopProgressIndicator()
 		if err != nil {
 			return fmt.Errorf("failed to get jobs: %w", err)
@@ -305,21 +305,12 @@ func runView(opts *ViewOptions) error {
 	}
 
 	var annotations []shared.Annotation
-
-	var annotationErr error
-	var as []shared.Annotation
 	for _, job := range jobs {
-		as, annotationErr = shared.GetAnnotations(client, repo, job)
-		if annotationErr != nil {
-			break
+		as, err := shared.GetAnnotations(client, repo, job)
+		if err != nil {
+			return fmt.Errorf("failed to get annotations: %w", err)
 		}
 		annotations = append(annotations, as...)
-	}
-
-	opts.IO.StopProgressIndicator()
-
-	if annotationErr != nil {
-		return fmt.Errorf("failed to get annotations: %w", annotationErr)
 	}
 
 	out := opts.IO.Out
