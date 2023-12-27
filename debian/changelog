@@ -1,3 +1,16 @@
+gh (2.40.1+dfsg1-1) unstable; urgency=medium
+
+  * New upstream version 2.40.1+dfsg1
+  * Update versioned dependencies as per go.mod
+  * Remove github.com/cli/crypto fork originally for "ssh: support RSA
+    SHA-2 (RFC8332) signatures"; see https://github.com/cli/cli/pull/8204
+  * Bump local copy of google.golang.org/grpc from v1.49.0 to v1.56.3
+  * Remove local copy of google.golang.org/grpc v1.49.0 in favour of
+    Debian golang-github-golang-protobuf-1-5-dev (>= 1.5.3) package
+  * Remove previously backported upstream 0002-go-md2man-fix.patch
+
+ -- Anthony Fok <foka@debian.org>  Wed, 27 Dec 2023 13:20:19 -0700
+
 gh (2.35.0-1) unstable; urgency=medium
 
   * New upstream version 2.35.0
