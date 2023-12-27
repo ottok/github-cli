@@ -13,14 +13,6 @@ Copyright: 2021 Anthony Fok <foka@debian.org>
 License: Expat
 Comment: Debian packaging is licensed under the same terms as upstream
 
-Files: debian/go/src/github.com/cli/crypto/*
-Copyright: 2009 The Go Authors
-License: BSD-3-Clause
-Comment:
- This is github.com/cli/crypto v0.0.0-20210929142629-6be313f59b03
- which is a temporary fork replacing golang.org/x/crypto for
- "ssh: support RSA SHA-2 (RFC8332) signatures".
-
 Files: debian/go/src/github.com/golang/protobuf/*
 Copyright: 2008-2016, The Go Authors.
            2008 Google Inc.
