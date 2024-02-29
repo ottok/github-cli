@@ -1,0 +1,22 @@
+From: Shengjing Zhu <zhsj@debian.org>
+Date: Thu, 29 Feb 2024 19:28:34 +0800
+Subject: Skip failed TestHTTPClientSanitizeJSONControlCharactersC0 on go1.22
+
+Go1.22 changes json encoding behavior.
+https://github.com/golang/go/issues/64346
+---
+ api/http_client_test.go | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/api/http_client_test.go b/api/http_client_test.go
+index dca032e..0155e8a 100644
+--- a/api/http_client_test.go
++++ b/api/http_client_test.go
+@@ -192,6 +192,7 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
+ }
+ 
+ func TestHTTPClientSanitizeJSONControlCharactersC0(t *testing.T) {
++	t.Skip("https://github.com/cli/cli/issues/8668")
+ 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+ 		issue := Issue{
+ 			Title: "\u001B[31mRed Title\u001B[0m",

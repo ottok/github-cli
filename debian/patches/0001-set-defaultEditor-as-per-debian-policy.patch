@@ -1,17 +1,28 @@
-Description: Change default editor from nano to /usr/bin/editor
- GitHub CLI gh sets nano as the default editor.  However, as per
- Debian Policy §11.4, the default editor should be /usr/bin/editor,
- not nano.  Thanks to Jakub Wilk for the bug report.
-Author: Anthony Fok <foka@debian.org>
+From: Anthony Fok <foka@debian.org>
+Date: Thu, 29 Feb 2024 19:28:08 +0800
+Subject: Change default editor from nano to /usr/bin/editor
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
 Origin: vendor
 Bug-Debian: https://bugs.debian.org/1008761
 Forwarded: not-needed
 Last-Update: 2022-05-31, 2022-09-05
+
+GitHub CLI gh sets nano as the default editor.  However, as per
+Debian Policy §11.4, the default editor should be /usr/bin/editor,
+not nano.  Thanks to Jakub Wilk for the bug report.
+Last-Update: 2022-05-31, 2022-09-05
 ---
-This patch header follows DEP-3: http://dep.debian.net/deps/dep3/
+ pkg/surveyext/editor.go | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/pkg/surveyext/editor.go b/pkg/surveyext/editor.go
+index 420ecc4..d92ab9a 100644
 --- a/pkg/surveyext/editor.go
 +++ b/pkg/surveyext/editor.go
-@@ -28,6 +28,8 @@
+@@ -28,6 +28,8 @@ func init() {
  		defaultEditor = e
  	} else if runtime.GOOS == "windows" {
  		defaultEditor = "notepad"

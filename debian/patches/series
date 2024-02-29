@@ -1,1 +1,2 @@
 0001-set-defaultEditor-as-per-debian-policy.patch
+0002-Skip-failed-TestHTTPClientSanitizeJSONControlCharact.patch
