@@ -1,3 +1,10 @@
+gh (2.44.1-2) unstable; urgency=medium
+
+  * Team upload
+  * Skip failed TestHTTPClientSanitizeJSONControlCharactersC0 on go1.22.
+
+ -- Shengjing Zhu <zhsj@debian.org>  Thu, 29 Feb 2024 19:35:33 +0800
+
 gh (2.44.1-1) unstable; urgency=medium
 
   * New upstream version 2.44.1
