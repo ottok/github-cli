@@ -1,3 +1,10 @@
+gh (2.45.0-1) unstable; urgency=medium
+
+  * New upstream version 2.45.0
+  * Bump versioned dependency as per go.mod
+
+ -- Anthony Fok <foka@debian.org>  Tue, 05 Mar 2024 09:48:51 -0700
+
 gh (2.44.1-2) unstable; urgency=medium
 
   * Team upload
