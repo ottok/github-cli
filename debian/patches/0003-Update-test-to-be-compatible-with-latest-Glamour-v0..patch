@@ -1,0 +1,157 @@
+From: =?utf-8?b?T3R0byBLZWvDpGzDpGluZW4=?= <otto@kekalainen.net>
+Date: Sat, 28 Dec 2024 13:36:10 -0800
+Subject: Update test to be compatible with latest Glamour v0.8.0
+
+Latest Glamour has slightly changed logic in line length / wrapping,
+resulting test failures due to string mismatch. Update tests and bump
+dependency to v0.8.0, and others to the bare minimal level as generated
+by `go mod tidy`.
+
+This was detected then building the GitHub cli pacakge `gh` in Debian
+started to fail with src:golang-github-charmbracelet-glamour 0.8.0-1.
+
+Note: The description above is cherry-picked from upstream submission.
+The patch in Debian omits changes to go.mod and go.sum as they are not
+really used in Debian for dependency management.
+
+Forwarded: https://github.com/cli/cli/pull/10151
+---
+ pkg/cmd/gist/view/view_test.go    |  4 ++--
+ pkg/cmd/pr/create/create_test.go  |  4 ++--
+ pkg/cmd/pr/review/review_test.go  |  2 +-
+ pkg/cmd/release/view/view_test.go |  8 ++++----
+ pkg/cmd/repo/view/view_test.go    | 10 +++++-----
+ 5 files changed, 14 insertions(+), 14 deletions(-)
+
+diff --git a/pkg/cmd/gist/view/view_test.go b/pkg/cmd/gist/view/view_test.go
+index c571422..ebfbd6c 100644
+--- a/pkg/cmd/gist/view/view_test.go
++++ b/pkg/cmd/gist/view/view_test.go
+@@ -219,7 +219,7 @@ func Test_viewRun(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n  # foo                                                                       \n\n",
++			wantOut: "cicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n  # foo                                                                           \n\n",
+ 		},
+ 		{
+ 			name: "multiple files, trailing newlines",
+@@ -260,7 +260,7 @@ func Test_viewRun(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                              \n  • foo                                                                       \n\n",
++			wantOut: "some files\n\ncicada.txt\n\nbwhiizzzbwhuiiizzzz\n\nfoo.md\n\n\n                                                                                  \n  • foo                                                                           \n\n",
+ 		},
+ 		{
+ 			name: "multiple files, raw",
+diff --git a/pkg/cmd/pr/create/create_test.go b/pkg/cmd/pr/create/create_test.go
+index b7d0e46..1750582 100644
+--- a/pkg/cmd/pr/create/create_test.go
++++ b/pkg/cmd/pr/create/create_test.go
+@@ -420,7 +420,7 @@ func Test_createRun(t *testing.T) {
+ 				`MaintainerCanModify: false`,
+ 				`Body:`,
+ 				``,
+-				`  my body                                                                     `,
++				`  my body                                                                         `,
+ 				``,
+ 				``,
+ 			},
+@@ -492,7 +492,7 @@ func Test_createRun(t *testing.T) {
+ 				`MaintainerCanModify: false`,
+ 				`Body:`,
+ 				``,
+-				`  BODY                                                                        `,
++				`  BODY                                                                            `,
+ 				``,
+ 				``,
+ 			},
+diff --git a/pkg/cmd/pr/review/review_test.go b/pkg/cmd/pr/review/review_test.go
+index 0d59916..f679567 100644
+--- a/pkg/cmd/pr/review/review_test.go
++++ b/pkg/cmd/pr/review/review_test.go
+@@ -283,7 +283,7 @@ func TestPRReview_interactive(t *testing.T) {
+ 	assert.Equal(t, heredoc.Doc(`
+ 		Got:
+ 
+-		  cool story                                                                  
++		  cool story                                                                      
+ 		
+ 	`), output.String())
+ 	assert.Equal(t, "✓ Approved pull request OWNER/REPO#123\n", output.Stderr())
+diff --git a/pkg/cmd/release/view/view_test.go b/pkg/cmd/release/view/view_test.go
+index c8b8379..0997739 100644
+--- a/pkg/cmd/release/view/view_test.go
++++ b/pkg/cmd/release/view/view_test.go
+@@ -122,8 +122,8 @@ func Test_viewRun(t *testing.T) {
+ 				v1.2.3
+ 				MonaLisa released this about 1 day ago
+ 				
+-				                                                                              
+-				  • Fixed bugs                                                                
++				                                                                                  
++				  • Fixed bugs                                                                    
+ 				
+ 				
+ 				Assets
+@@ -146,8 +146,8 @@ func Test_viewRun(t *testing.T) {
+ 				v1.2.3
+ 				MonaLisa released this about 1 day ago
+ 				
+-				                                                                              
+-				  • Fixed bugs                                                                
++				                                                                                  
++				  • Fixed bugs                                                                    
+ 				
+ 				
+ 				Assets
+diff --git a/pkg/cmd/repo/view/view_test.go b/pkg/cmd/repo/view/view_test.go
+index 16b5257..74bc555 100644
+--- a/pkg/cmd/repo/view/view_test.go
++++ b/pkg/cmd/repo/view/view_test.go
+@@ -186,7 +186,7 @@ func Test_ViewRun(t *testing.T) {
+ 				social distancing
+ 
+ 
+-				  # truly cool readme check it out                                            
++				  # truly cool readme check it out                                                
+ 
+ 
+ 
+@@ -205,7 +205,7 @@ func Test_ViewRun(t *testing.T) {
+ 				social distancing
+ 
+ 
+-				  # truly cool readme check it out                                            
++				  # truly cool readme check it out                                                
+ 
+ 
+ 
+@@ -223,7 +223,7 @@ func Test_ViewRun(t *testing.T) {
+ 				social distancing
+ 
+ 
+-				  # truly cool readme check it out                                            
++				  # truly cool readme check it out                                                
+ 
+ 
+ 
+@@ -238,7 +238,7 @@ func Test_ViewRun(t *testing.T) {
+ 				social distancing
+ 
+ 
+-				  # truly cool readme check it out                                            
++				  # truly cool readme check it out                                                
+ 
+ 
+ 
+@@ -576,7 +576,7 @@ func Test_ViewRun_HandlesSpecialCharacters(t *testing.T) {
+ 				Some basic special characters " & / < > '
+ 
+ 
+-				  # < is always > than & ' and "                                              
++				  # < is always > than & ' and "                                                  
+ 
+ 
+ 
