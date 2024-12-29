@@ -1,3 +1,4 @@
 0001-set-defaultEditor-as-per-debian-policy.patch
 0002-Skip-failed-TestHTTPClientSanitizeJSONControlCharact.patch
 0003-Update-test-to-be-compatible-with-Glamour-v0.8.patch
+0004-fix-CVE-2024-52308.patch
