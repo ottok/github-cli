@@ -1,3 +1,15 @@
+gh (2.46.0-2) unstable; urgency=medium
+
+  * Team upload.
+  [ Otto Kekäläinen ]
+  * Update test to be compatible with Glamour v0.8.0. Closes: #1091585.
+  [ Santiago Vila ]
+  * Update build-dependency on golang-github-charmbracelet-glamour-dev.
+  [ Loren M. Lang ]
+  * Apply patch to fix CVE-2024-52308. Closes: #1087883.
+
+ -- Santiago Vila <sanvila@debian.org>  Mon, 30 Dec 2024 14:10:00 +0100
+
 gh (2.46.0-1) unstable; urgency=medium
 
   * New upstream version 2.46.0
