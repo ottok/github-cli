@@ -4,3 +4,7 @@
 ---
 include:
   - https://salsa.debian.org/go-team/infra/pkg-go-tools/-/raw/master/pipeline/test-archive.yml
+test_the_archive:
+  before_script:
+    - apt-get update
+    - apt-get install -y bash-completion
