@@ -10,16 +10,16 @@ include:
   - project: go-team/infra/pkg-go-tools
     ref: master
     file: pipeline/test-archive.yml
-    # Run the Go team CI only in the go-team project that has access to GitLab
-    # CI runners tagged 'go-ci'
-    rules:
-      - if: $CI_PROJECT_ROOT_NAMESPACE  == "go-team"
 
 # Install requried prerequisites needed for the job included above
 test_the_archive:
   before_script:
     - apt-get update
     - apt-get install -y bash-completion
+  # Run the Go team CI only in the go-team project that has access to GitLab
+  # CI runners tagged 'go-ci'
+  rules:
+    - if: $CI_PROJECT_ROOT_NAMESPACE  == "go-team"
 
 Salsa CI:
   stage: package
