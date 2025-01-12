@@ -4,3 +4,4 @@
 0004-fix-CVE-2024-52308.patch
 0005-fix-CVE-2024-54132.patch
 0006-fix-CVE-2024-53858.patch
+0007-fix-flaky-run-download-test.patch
