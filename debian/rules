@@ -27,7 +27,9 @@ LDFLAGS := -ldflags \
 
 all:
 	@echo $(LDFLAGS)
-%:
+
+# Force this to run so the build target can be manually executed despite build/ existing
+%: FORCE
 	dh $@ --builddirectory=_build --buildsystem=golang
 
 execute_before_dh_auto_configure:
@@ -47,3 +49,6 @@ override_dh_auto_build:
 
 override_dh_auto_install:
 	dh_auto_install -- --no-source
+
+FORCE:
+.PHONY: FORCE
