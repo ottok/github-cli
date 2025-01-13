@@ -1,3 +1,19 @@
+gh (2.46.0-3) unstable; urgency=medium
+
+  [ Loren M. Lang ]
+  * Apply patch to fix CVE-2024-54132 (Closes: #1089120)
+  * Apply patch to fix CVE-2024-53858 (Closes: #1088808)
+  * Don't let $GH_TOKEN from the build environment break the test
+  * Fixed a build error introduced in a recent test change
+  * Fixed an issue with flaky download tests
+  * Enabled Salsa CI for packaging repository for improved quality
+    assurance before uploads to Debian archives
+
+  [ Otto Kekäläinen ]
+  * Update copyright and uploaders metadata to match current maintainers
+
+ -- Otto Kekäläinen <otto@debian.org>  Sun, 12 Jan 2025 21:43:14 -0800
+
 gh (2.46.0-2) unstable; urgency=medium
 
   * Team upload.
