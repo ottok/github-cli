@@ -9,7 +9,10 @@ Copyright: 2019 GitHub Inc.
 License: Expat
 
 Files: debian/*
-Copyright: 2021 Anthony Fok <foka@debian.org>
+Copyright:
+ 2021-2024 Anthony Fok <foka@debian.org>
+ 2024-2025 Otto Kekäläinen <otto@debian.org>
+ 2025 Loren M. Lang <lorenl@north-winds.org>
 License: Expat
 Comment: Debian packaging is licensed under the same terms as upstream
 

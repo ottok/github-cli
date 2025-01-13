@@ -2,7 +2,7 @@ Source: gh
 Section: golang
 Priority: optional
 Maintainer: Debian Go Packaging Team <team+pkg-go@tracker.debian.org>
-Uploaders: Anthony Fok <foka@debian.org>
+Uploaders: Otto Kekäläinen <otto@debian.org>, Loren M. Lang <lorenl@north-winds.org>
 Rules-Requires-Root: no
 Build-Depends: debhelper-compat (= 13),
                dh-sequence-bash-completion,
