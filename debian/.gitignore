@@ -2,6 +2,7 @@
 *.log
 *.substvars
 /.debhelper/
+/build/
 /debhelper-build-stamp
 /files
 /gh/

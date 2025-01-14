@@ -30,22 +30,22 @@ all:
 
 # Force this to run so the build target can be manually executed despite build/ existing
 %: FORCE
-	dh $@ --builddirectory=_build --buildsystem=golang
+	dh $@ --builddirectory=debian/build --buildsystem=golang
 
 execute_before_dh_auto_configure:
-	mkdir -p _build/src/google.golang.org
-	ln -s $(CURDIR)/debian/go/src/google.golang.org/grpc _build/src/google.golang.org/grpc
+	mkdir -p debian/build/src/google.golang.org
+	ln -s $(CURDIR)/debian/go/src/google.golang.org/grpc debian/build/src/google.golang.org/grpc
 
 override_dh_auto_build:
 	@command -V go
 	@go version
 	dh_auto_build -- $(LDFLAGS)
-	_build/bin/gh --version
-	mkdir -p _build/completion/bash _build/completion/zsh
-	_build/bin/gh completion -s bash > _build/completion/bash/gh
-	_build/bin/gh completion -s zsh > _build/completion/zsh/_gh
-	_build/bin/gen-docs --man-page --doc-path _build/share/man/man1/
-	$(RM) _build/bin/gen-docs
+	debian/build/bin/gh --version
+	mkdir -p debian/build/completion/bash debian/build/completion/zsh
+	debian/build/bin/gh completion -s bash > debian/build/completion/bash/gh
+	debian/build/bin/gh completion -s zsh > debian/build/completion/zsh/_gh
+	debian/build/bin/gen-docs --man-page --doc-path debian/build/share/man/man1/
+	$(RM) debian/build/bin/gen-docs
 
 override_dh_auto_install:
 	dh_auto_install -- --no-source
