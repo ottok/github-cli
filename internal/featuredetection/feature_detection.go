@@ -4,28 +4,33 @@ import (
 	"net/http"
 
 	"github.com/cli/cli/v2/api"
-	"github.com/cli/cli/v2/internal/ghinstance"
+	"github.com/cli/cli/v2/internal/gh"
 	"golang.org/x/sync/errgroup"
+
+	ghauth "github.com/cli/go-gh/v2/pkg/auth"
 )
 
 type Detector interface {
 	IssueFeatures() (IssueFeatures, error)
 	PullRequestFeatures() (PullRequestFeatures, error)
 	RepositoryFeatures() (RepositoryFeatures, error)
+	ProjectsV1() gh.ProjectsV1Support
 }
 
 type IssueFeatures struct {
-	StateReason bool
+	StateReason       bool
+	ActorIsAssignable bool
 }
 
 var allIssueFeatures = IssueFeatures{
-	StateReason: true,
+	StateReason:       true,
+	ActorIsAssignable: true,
 }
 
 type PullRequestFeatures struct {
 	MergeQueue bool
 	// CheckRunAndStatusContextCounts indicates whether the API supports
-	// the checkRunCount, checkRunCountsByState, statusContextCount and stausContextCountsByState
+	// the checkRunCount, checkRunCountsByState, statusContextCount and statusContextCountsByState
 	// fields on the StatusCheckRollupContextConnection
 	CheckRunAndStatusContextCounts bool
 	CheckRunEvent                  bool
@@ -62,12 +67,13 @@ func NewDetector(httpClient *http.Client, host string) Detector {
 }
 
 func (d *detector) IssueFeatures() (IssueFeatures, error) {
-	if !ghinstance.IsEnterprise(d.host) {
+	if !ghauth.IsEnterprise(d.host) {
 		return allIssueFeatures, nil
 	}
 
 	features := IssueFeatures{
-		StateReason: false,
+		StateReason:       false,
+		ActorIsAssignable: false, // replaceActorsForAssignable GraphQL mutation unavailable on GHES
 	}
 
 	var featureDetection struct {
@@ -163,7 +169,7 @@ func (d *detector) PullRequestFeatures() (PullRequestFeatures, error) {
 }
 
 func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
-	if !ghinstance.IsEnterprise(d.host) {
+	if !ghauth.IsEnterprise(d.host) {
 		return allRepositoryFeatures, nil
 	}
 
@@ -197,4 +203,14 @@ func (d *detector) RepositoryFeatures() (RepositoryFeatures, error) {
 	}
 
 	return features, nil
+}
+
+func (d *detector) ProjectsV1() gh.ProjectsV1Support {
+	// Currently, projects v1 support is entirely dependent on the host. As this is deprecated in GHES,
+	// we will do feature detection on whether the GHES version has support.
+	if ghauth.IsEnterprise(d.host) {
+		return gh.ProjectsV1Supported
+	}
+
+	return gh.ProjectsV1Unsupported
 }

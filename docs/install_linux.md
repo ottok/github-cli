@@ -14,15 +14,16 @@ our release schedule.
 Install:
 
 ```bash
-sudo mkdir -p -m 755 /etc/apt/keyrings && wget -qO- https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
-&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
-&& sudo apt update \
-&& sudo apt install gh -y
+(type -p wget >/dev/null || (sudo apt update && sudo apt install wget -y)) \
+	&& sudo mkdir -p -m 755 /etc/apt/keyrings \
+	&& out=$(mktemp) && wget -nv -O$out https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+	&& cat $out | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null \
+	&& sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+	&& sudo mkdir -p -m 755 /etc/apt/sources.list.d \
+	&& echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+	&& sudo apt update \
+	&& sudo apt install gh -y
 ```
-
-> **Note**
-> We were recently forced to change our GPG signing key. If you've previously downloaded the `githubcli-archive-keyring.gpg` file, you should re-download it again per above instructions. If you are using a keyserver to download the key, the ID of the new key is `23F3D4EA75716059`.
 
 Upgrade:
 
@@ -31,15 +32,41 @@ sudo apt update
 sudo apt install gh
 ```
 
-### Fedora, CentOS, Red Hat Enterprise Linux (dnf)
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
 
-Install from our package repository for immediate access to latest releases:
+### Fedora, CentOS, Red Hat Enterprise Linux (DNF4 & DNF5)
+
+Install from our package repository for immediate access to latest releases.
+
+#### DNF5
+
+> [!IMPORTANT]
+> **These commands apply to DNF5 only**. If you're using DNF4, please use [the DNF4 instructions](#dnf4).
 
 ```bash
+# DNF5 installation commands
+sudo dnf install dnf5-plugins
+sudo dnf config-manager addrepo --from-repofile=https://cli.github.com/packages/rpm/gh-cli.repo
+sudo dnf install gh --repo gh-cli
+```
+
+#### DNF4
+
+> [!IMPORTANT]
+> **These commands apply to DNF4 only**. If you're using DNF5, please use [the DNF5 instructions](#dnf5).
+
+```bash
+# DNF4 installation commands
 sudo dnf install 'dnf-command(config-manager)'
 sudo dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
-sudo dnf install gh
+sudo dnf install gh --repo gh-cli
 ```
+
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
+
+### Fedora, CentOS, Red Hat Enterprise Linux - Community repository
 
 Alternatively, install from the [community repository](https://packages.fedoraproject.org/pkgs/gh/gh/):
 
@@ -63,14 +90,14 @@ sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.re
 sudo yum install gh
 ```
 
-> **Note**
-> We were recently forced to change our GPG signing key. If you've added the repository previously and now you're getting a GPG signing key error, disable the repository first with `sudo yum-config-manager --disable gh-cli` and add it again with `sudo yum-config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo`.
-
 Upgrade:
 
 ```bash
 sudo yum update gh
 ```
+
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
 
 ### openSUSE/SUSE Linux (zypper)
 
@@ -88,6 +115,9 @@ Upgrade:
 sudo zypper ref
 sudo zypper update gh
 ```
+
+> [!NOTE]
+> If errors regarding GPG signatures occur, see [cli/cli#9569](https://github.com/cli/cli/issues/9569) for steps to fix this.
 
 ## Manual installation
 
@@ -132,6 +162,20 @@ Or via [pkg(8)](https://www.freebsd.org/cgi/man.cgi?pkg(8)):
 
 ```bash
 pkg install gh
+```
+
+### MidnightBSD
+
+MidnightBSD users can install from [mports](https://www.midnightbsd.org/documentation/mports/index.html)
+
+```bash
+cd /usr/mports/devel/gh/ && make install clean
+```
+
+Or via [mport(1)](http://man.midnightbsd.org/cgi-bin/man.cgi/mport):
+
+```bash
+mport install gh
 ```
 
 ### NetBSD/pkgsrc
@@ -202,6 +246,20 @@ Nix/NixOS users can install from [nixpkgs](https://search.nixos.org/packages?que
 nix-env -iA nixos.gh
 ```
 
+### Flox
+
+Flox users can install from the [official community nixpkgs](https://github.com/flox/nixpkgs).
+
+```bash
+# To install
+flox install gh
+
+# To upgrade
+flox upgrade toplevel
+```
+
+For more information about Flox, see [its homepage](https://flox.dev).
+
 ### openSUSE Tumbleweed
 
 openSUSE Tumbleweed users can install from the [official distribution repo](https://software.opensuse.org/package/gh):
@@ -231,6 +289,22 @@ Void Linux users can install from the [official distribution repo](https://voidl
 ```bash
 sudo xbps-install github-cli
 ```
+
+### Manjaro Linux
+Manjaro Linux users can install from the [official extra repository](https://manjaristas.org/branch_compare?q=github-cli):
+
+```bash
+pamac install github-cli
+```
+
+### Solus Linux
+Solus Linux users can install using [eopkg package manager](https://help.getsol.us/docs/user/package-management/basics/):
+
+```bash
+sudo eopkg install github-cli
+```
+
+For more information about the `github-cli` package, see [the package definition](https://github.com/getsolus/packages/blob/main/packages/g/github-cli/package.yml) in the `getsolus/packages` repository.
 
 [releases page]: https://github.com/cli/cli/releases/latest
 [arch linux repo]: https://www.archlinux.org/packages/extra/x86_64/github-cli
