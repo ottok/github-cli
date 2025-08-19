@@ -1,16 +1,22 @@
-Description: fix flaky gh run download test
- Use consistent slice ordering in run download tests. The previous
- implementation was relying on the iteration order of a map when
- responding with a list of test artifacts from the fakePlatform, which
- resulted in flakiness. This PR makes use of a slice instead.
-Author: William Martin <williammartin@github.com>
+From: William Martin <williammartin@github.com>
+Date: Mon, 18 Aug 2025 19:31:03 -0700
+Subject: fix flaky gh run download test
+
 Origin: https://github.com/cli/cli/compare/1136764c..a47b4c9f
 Bug: https://github.com/cli/cli/pull/10006
 Applied-Upstream: 2.63.2
 Last-Update: 2025-01-12
 
+Use consistent slice ordering in run download tests. The previous
+implementation was relying on the iteration order of a map when
+responding with a list of test artifacts from the fakePlatform, which
+resulted in flakiness. This PR makes use of a slice instead.
+---
+ pkg/cmd/run/download/download_test.go | 605 ++++++++++++++++++----------------
+ 1 file changed, 326 insertions(+), 279 deletions(-)
+
 diff --git a/pkg/cmd/run/download/download_test.go b/pkg/cmd/run/download/download_test.go
-index aeab2027..86766123 100644
+index aeab202..8676612 100644
 --- a/pkg/cmd/run/download/download_test.go
 +++ b/pkg/cmd/run/download/download_test.go
 @@ -145,29 +145,40 @@ func Test_NewCmdDownload(t *testing.T) {
