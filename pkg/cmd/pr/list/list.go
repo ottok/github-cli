@@ -55,24 +55,27 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 		Use:   "list",
 		Short: "List pull requests in a repository",
 		Long: heredoc.Doc(`
-			List pull requests in a GitHub repository.
+			List pull requests in a GitHub repository. By default, this only lists open PRs.
 
 			The search query syntax is documented here:
 			<https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests>
 		`),
 		Example: heredoc.Doc(`
-			List PRs authored by you
+			# List PRs authored by you
 			$ gh pr list --author "@me"
 
-			List only PRs with all of the given labels
+			# List PRs with a specific head branch name
+			$ gh pr list --head "typo"
+
+			# List only PRs with all of the given labels
 			$ gh pr list --label bug --label "priority 1"
 
-			Filter PRs using search syntax
+			# Filter PRs using search syntax
 			$ gh pr list --search "status:success review:required"
 
-			Find a PR that introduced a given commit
+			# Find a PR that introduced a given commit
 			$ gh pr list --search "<SHA>" --state merged
-    	`),
+		`),
 		Aliases: []string{"ls"},
 		Args:    cmdutil.NoArgsQuoteReminder,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -102,7 +105,7 @@ func NewCmdList(f *cmdutil.Factory, runF func(*ListOptions) error) *cobra.Comman
 	cmd.Flags().IntVarP(&opts.LimitResults, "limit", "L", 30, "Maximum number of items to fetch")
 	cmdutil.StringEnumFlag(cmd, &opts.State, "state", "s", "open", []string{"open", "closed", "merged", "all"}, "Filter by state")
 	cmd.Flags().StringVarP(&opts.BaseBranch, "base", "B", "", "Filter by base branch")
-	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", "Filter by head branch")
+	cmd.Flags().StringVarP(&opts.HeadBranch, "head", "H", "", `Filter by head branch ("<owner>:<branch>" syntax not supported)`)
 	cmd.Flags().StringSliceVarP(&opts.Labels, "label", "l", nil, "Filter by label")
 	cmd.Flags().StringVarP(&opts.Author, "author", "A", "", "Filter by author")
 	cmd.Flags().StringVar(&appAuthor, "app", "", "Filter by GitHub App author")
@@ -222,9 +225,9 @@ func listRun(opts *ListOptions) error {
 		table.AddField(text.RemoveExcessiveWhitespace(pr.Title))
 		table.AddField(pr.HeadLabel(), tableprinter.WithColor(cs.Cyan))
 		if !isTTY {
-			table.AddField(prStateWithDraft(&pr))
+			table.AddField(shared.PrStateWithDraft(&pr))
 		}
-		table.AddTimeField(opts.Now(), pr.CreatedAt, cs.Gray)
+		table.AddTimeField(opts.Now(), pr.CreatedAt, cs.Muted)
 		table.EndRow()
 	}
 	err = table.Render()
@@ -233,12 +236,4 @@ func listRun(opts *ListOptions) error {
 	}
 
 	return nil
-}
-
-func prStateWithDraft(pr *api.PullRequest) string {
-	if pr.IsDraft && pr.State == "OPEN" {
-		return "DRAFT"
-	}
-
-	return pr.State
 }
