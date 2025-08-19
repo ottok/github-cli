@@ -19,7 +19,7 @@ Last-Update: 2022-05-31, 2022-09-05
  1 file changed, 2 insertions(+)
 
 diff --git a/pkg/surveyext/editor.go b/pkg/surveyext/editor.go
-index 420ecc4..d92ab9a 100644
+index 82533f9..fa5d225 100644
 --- a/pkg/surveyext/editor.go
 +++ b/pkg/surveyext/editor.go
 @@ -28,6 +28,8 @@ func init() {

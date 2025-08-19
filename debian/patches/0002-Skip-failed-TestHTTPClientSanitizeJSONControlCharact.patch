@@ -9,7 +9,7 @@ https://github.com/golang/go/issues/64346
  1 file changed, 1 insertion(+)
 
 diff --git a/api/http_client_test.go b/api/http_client_test.go
-index dca032e..0155e8a 100644
+index ce20a26..e6ea15c 100644
 --- a/api/http_client_test.go
 +++ b/api/http_client_test.go
 @@ -192,6 +192,7 @@ func TestHTTPClientRedirectAuthenticationHeaderHandling(t *testing.T) {
