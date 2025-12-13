@@ -1,3 +1,16 @@
+gh (2.46.0-4) unstable; urgency=medium
+
+  [ Simon Josefsson ]
+  * Team upload.
+  * Use B-D on golang-github-cenkalti-backoff-v4-dev
+  * Ignore test failures (Closes: #1120253)
+
+  [ Otto Kekäläinen ]
+  * Add minimal gbp.conf so that it is explicit what settings this repo has
+  * Stop polluting upstream file paths and put build artifacts in debian/build
+
+ -- Simon Josefsson <simon@josefsson.org>  Sat, 13 Dec 2025 23:19:28 +0100
+
 gh (2.46.0-3) unstable; urgency=medium
 
   [ Loren M. Lang ]
